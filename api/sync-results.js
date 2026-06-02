@@ -1,64 +1,48 @@
-import { createClient } from "@supabase/supabase-js";
-
-const NRL_LEAGUE_ID = "4416";
-
-function parseScore(value) {
-  if (value === null || value === undefined || value === "") return null;
-  return Number(value);
-}
+import { fetchNrlRound, supabaseAdmin } from "./_nrlScrape.js";
 
 export default async function handler(req, res) {
   try {
     const season = String(req.query.season || new Date().getFullYear());
+    const round = req.query.round ? String(req.query.round) : "";
 
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const supabase = supabaseAdmin();
 
-    const { data: games, error: gameError } = await supabase
-      .from("games")
-      .select("id, external_id")
-      .eq("season", season)
-      .not("external_id", "is", null);
+    let rounds = [];
+    if (round) {
+      rounds = [round];
+    } else {
+      const { data: existingGames, error } = await supabase
+        .from("games")
+        .select("round")
+        .eq("season", season);
 
-    if (gameError) throw gameError;
-
-    const apiKey = process.env.THESPORTSDB_API_KEY || "3";
-    const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${NRL_LEAGUE_ID}&s=${season}`;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Sports API failed: ${response.status}`);
-
-    const json = await response.json();
-    const events = json.events || [];
+      if (error) throw error;
+      rounds = [...new Set((existingGames || []).map((game) => String(game.round)))];
+    }
 
     let updated = 0;
 
-    for (const game of games || []) {
-      const event = events.find((item) => String(item.idEvent) === String(game.external_id));
-      if (!event) continue;
+    for (const roundNumber of rounds) {
+      const scraped = await fetchNrlRound(season, roundNumber);
+      const completed = scraped.filter((game) => game.home_score !== null && game.away_score !== null);
 
-      const homeScore = parseScore(event.intHomeScore);
-      const awayScore = parseScore(event.intAwayScore);
+      for (const game of completed) {
+        const { error } = await supabase
+          .from("games")
+          .update({
+            home_score: game.home_score,
+            away_score: game.away_score,
+            status: "completed",
+            locked: true,
+          })
+          .eq("external_id", game.external_id);
 
-      if (homeScore === null || awayScore === null) continue;
-
-      const { error } = await supabase
-        .from("games")
-        .update({
-          home_score: homeScore,
-          away_score: awayScore,
-          status: "completed",
-          locked: true,
-        })
-        .eq("id", game.id);
-
-      if (error) throw error;
-      updated++;
+        if (error) throw error;
+        updated++;
+      }
     }
 
-    return res.status(200).json({ ok: true, updated });
+    return res.status(200).json({ ok: true, source: "nrl.com scrape", updated });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
