@@ -124,6 +124,29 @@ export default function App(){
     setSaving(false);
   }
   
+
+  async function invitePlayer(){
+    if(!isAdmin)return;
+    const email=inviteEmail.trim().toLowerCase();
+    if(!email){setAuthError("Enter an email address to invite."); return}
+    setSaving(true); setAuthError(""); setNotice("");
+    try{
+      const response=await fetch("/api/invite-player",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email})
+      });
+      const result=await response.json();
+      if(!response.ok||!result.ok) throw new Error(result.error||"Could not send invite.");
+      setNotice(`Invite sent to ${email}.`);
+      setInviteEmail("");
+      await refreshSupabaseData(currentUser);
+    }catch(error){
+      setAuthError(error.message||"Could not send invite.");
+    }
+    setSaving(false);
+  }
+
   async function updatePlayerRole(playerId,role){
     if(!isAdmin)return;
     const target=database.players.find(p=>p.id===playerId);
@@ -241,7 +264,7 @@ function updateTip(gameId,update){
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound}/>} 
-    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} updatePlayerRole={updatePlayerRole} saving={saving}/>} 
+    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerRole={updatePlayerRole} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} saving={saving}/>} 
   </main></div>;
 }
@@ -356,7 +379,7 @@ function TipCheckPanel({database,visibleGames,selectedRound}){
 
 
 
-function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
+function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerRole,saving}){
   const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const adminCount=players.filter(p=>p.role==="admin").length;
   const playerCount=players.filter(p=>p.role!=="admin").length;
@@ -386,6 +409,12 @@ function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
         </div>
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4 text-sm text-slate-300">
           Tip: avoid deleting users because it can affect old tips and leaderboard history. Promote/demote roles here instead.
+        </div>
+        <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
+          <div className="mb-2 text-sm font-bold text-slate-200">Invite a player</div>
+          <Input label="Email" value={inviteEmail} onChange={setInviteEmail} placeholder="player@email.com"/>
+          <Button onClick={invitePlayer} disabled={saving} className="mt-3 w-full rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">{saving?"Sending...":"Send Invite"}</Button>
+          <p className="mt-3 text-xs text-slate-400">They will receive an email link to create their account.</p>
         </div>
       </CardContent>
     </Card>
