@@ -17,23 +17,63 @@ const supabase = hasSupabase ? createClient(supabaseUrl, supabaseAnonKey) : null
 const NRL_LEAGUE_ID = "4416";
 const STORAGE_KEY = "nrl-tipping-comp-preview-v3";
 
+const wikiLogo = (file) => `https://en.wikipedia.org/wiki/Special:Redirect/file/${encodeURIComponent(file)}?width=120`;
+
 const teamLogoMap = {
-  "Broncos":"https://www.thesportsdb.com/images/media/team/badge/psuwsp1429610811.png", "Brisbane Broncos":"https://www.thesportsdb.com/images/media/team/badge/psuwsp1429610811.png",
-  "Storm":"https://www.thesportsdb.com/images/media/team/badge/rqwvus1429610896.png", "Melbourne Storm":"https://www.thesportsdb.com/images/media/team/badge/rqwvus1429610896.png",
-  "Panthers":"https://www.thesportsdb.com/images/media/team/badge/uvpyru1429610881.png", "Penrith Panthers":"https://www.thesportsdb.com/images/media/team/badge/uvpyru1429610881.png",
-  "Eels":"https://www.thesportsdb.com/images/media/team/badge/rxtqtr1429610859.png", "Parramatta Eels":"https://www.thesportsdb.com/images/media/team/badge/rxtqtr1429610859.png",
-  "Warriors":"https://www.thesportsdb.com/images/media/team/badge/okm1423062521.png", "New Zealand Warriors":"https://www.thesportsdb.com/images/media/team/badge/okm1423062521.png",
-  "Dragons":"https://www.thesportsdb.com/images/media/team/badge/wqwsut1429610836.png", "St George Illawarra Dragons":"https://www.thesportsdb.com/images/media/team/badge/wqwsut1429610836.png", "St. George Illawarra Dragons":"https://www.thesportsdb.com/images/media/team/badge/wqwsut1429610836.png",
-  "Cowboys":"https://www.thesportsdb.com/images/media/team/badge/uwwrrq1429610915.png", "North Queensland Cowboys":"https://www.thesportsdb.com/images/media/team/badge/uwwrrq1429610915.png",
-  "Raiders":"https://www.thesportsdb.com/images/media/team/badge/vyxxuw1429610850.png", "Canberra Raiders":"https://www.thesportsdb.com/images/media/team/badge/vyxxuw1429610850.png",
-  "Rabbitohs":"https://www.thesportsdb.com/images/media/team/badge/vswrtt1429610876.png", "South Sydney Rabbitohs":"https://www.thesportsdb.com/images/media/team/badge/vswrtt1429610876.png",
-  "Roosters":"https://www.thesportsdb.com/images/media/team/badge/vywvut1429610830.png", "Sydney Roosters":"https://www.thesportsdb.com/images/media/team/badge/vywvut1429610830.png",
-  "Sharks":"https://www.thesportsdb.com/images/media/team/badge/rrxpsr1429610864.png", "Cronulla Sharks":"https://www.thesportsdb.com/images/media/team/badge/rrxpsr1429610864.png", "Cronulla-Sutherland Sharks":"https://www.thesportsdb.com/images/media/team/badge/rrxpsr1429610864.png",
-  "Bulldogs":"https://www.thesportsdb.com/images/media/team/badge/vsswut1429610904.png", "Canterbury Bulldogs":"https://www.thesportsdb.com/images/media/team/badge/vsswut1429610904.png", "Canterbury-Bankstown Bulldogs":"https://www.thesportsdb.com/images/media/team/badge/vsswut1429610904.png",
-  "Sea Eagles":"https://www.thesportsdb.com/images/media/team/badge/wutwxs1429610909.png", "Manly Sea Eagles":"https://www.thesportsdb.com/images/media/team/badge/wutwxs1429610909.png", "Manly-Warringah Sea Eagles":"https://www.thesportsdb.com/images/media/team/badge/wutwxs1429610909.png",
-  "Knights":"https://www.thesportsdb.com/images/media/team/badge/yxxpux1429610887.png", "Newcastle Knights":"https://www.thesportsdb.com/images/media/team/badge/yxxpux1429610887.png",
-  "Titans":"https://www.thesportsdb.com/images/media/team/badge/wvrwtx1429610821.png", "Gold Coast Titans":"https://www.thesportsdb.com/images/media/team/badge/wvrwtx1429610821.png",
-  "Tigers":"https://www.thesportsdb.com/images/media/team/badge/tqpvrw1429610892.png", "Wests Tigers":"https://www.thesportsdb.com/images/media/team/badge/tqpvrw1429610892.png"
+  "Broncos": wikiLogo("Brisbane Broncos logo.svg"),
+  "Brisbane Broncos": wikiLogo("Brisbane Broncos logo.svg"),
+
+  "Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
+  "Canterbury Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
+  "Canterbury-Bankstown Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
+
+  "Cowboys": wikiLogo("North Queensland Cowboys logo.svg"),
+  "North Queensland Cowboys": wikiLogo("North Queensland Cowboys logo.svg"),
+
+  "Dolphins": wikiLogo("Dolphins (NRL) Logo.svg"),
+  "The Dolphins": wikiLogo("Dolphins (NRL) Logo.svg"),
+
+  "Dragons": wikiLogo("St. George Illawarra Dragons logo.svg"),
+  "St George Illawarra Dragons": wikiLogo("St. George Illawarra Dragons logo.svg"),
+  "St. George Illawarra Dragons": wikiLogo("St. George Illawarra Dragons logo.svg"),
+
+  "Eels": wikiLogo("Parramatta Eels logo.svg"),
+  "Parramatta Eels": wikiLogo("Parramatta Eels logo.svg"),
+
+  "Knights": wikiLogo("Newcastle Knights logo.svg"),
+  "Newcastle Knights": wikiLogo("Newcastle Knights logo.svg"),
+
+  "Panthers": wikiLogo("Penrith Panthers logo.svg"),
+  "Penrith Panthers": wikiLogo("Penrith Panthers logo.svg"),
+
+  "Rabbitohs": wikiLogo("South Sydney Rabbitohs Logo.svg"),
+  "South Sydney Rabbitohs": wikiLogo("South Sydney Rabbitohs Logo.svg"),
+
+  "Raiders": wikiLogo("Canberra Raiders Logo.svg"),
+  "Canberra Raiders": wikiLogo("Canberra Raiders Logo.svg"),
+
+  "Roosters": wikiLogo("Sydney Roosters logo.svg"),
+  "Sydney Roosters": wikiLogo("Sydney Roosters logo.svg"),
+
+  "Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
+  "Manly Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
+  "Manly-Warringah Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
+
+  "Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
+  "Cronulla Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
+  "Cronulla-Sutherland Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
+
+  "Storm": wikiLogo("Melbourne Storm Logo.svg"),
+  "Melbourne Storm": wikiLogo("Melbourne Storm Logo.svg"),
+
+  "Titans": wikiLogo("Gold Coast Titans logo.svg"),
+  "Gold Coast Titans": wikiLogo("Gold Coast Titans logo.svg"),
+
+  "Warriors": wikiLogo("New Zealand Warriors logo.svg"),
+  "New Zealand Warriors": wikiLogo("New Zealand Warriors logo.svg"),
+
+  "Tigers": wikiLogo("Wests Tigers 2022 Logo.svg"),
+  "Wests Tigers": wikiLogo("Wests Tigers 2022 Logo.svg")
 };
 
 const previewDatabase = {
@@ -50,7 +90,7 @@ const previewDatabase = {
 function loadPreviewDatabase(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||previewDatabase}catch{return previewDatabase}}
 function savePreviewDatabase(db){localStorage.setItem(STORAGE_KEY,JSON.stringify(db))}
 function makeId(prefix){return `${prefix}_${Math.random().toString(36).slice(2,9)}`}
-function getLogo(team,fallback){return (fallback&&String(fallback).startsWith("http"))?fallback:(teamLogoMap[team]||"")}
+function getLogo(team,fallback){return teamLogoMap[team] || ((fallback&&String(fallback).startsWith("http"))?fallback:"")}
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
 function getPrettyKickoff(game){ if(!game.kickoff_at) return game.kickoff||"TBC"; try{return new Intl.DateTimeFormat("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Australia/Brisbane"}).format(new Date(game.kickoff_at))}catch{return game.kickoff||"TBC"}}
@@ -366,7 +406,7 @@ function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){retu
 function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
 function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length; const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length; const remaining=Math.max(visibleGames.length-draftCount,0); return <section className="grid gap-5 lg:grid-cols-[280px_1fr]"><Card className="border-white/10 bg-white/10 text-white rounded-3xl"><CardContent className="p-5"><h2 className="mb-3 text-lg font-bold">Your tips</h2><p className="text-sm text-slate-300">Pick every game, then press Save Tips at the bottom.</p><div className="mt-5 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Saved tips</div><div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Tips remaining</div><div className="mt-1 text-3xl font-bold text-amber-300">{remaining}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Current points</div><div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div></div></CardContent></Card><div className="grid gap-4">{saveSuccess&&<Card className="rounded-3xl border border-emerald-400/40 bg-emerald-400/15 text-white"><CardContent className="p-5 text-center"><div className="text-3xl font-black text-emerald-300">✓ Tips saved!</div><p className="mt-2 text-sm text-emerald-100">Your tips for this round have been saved successfully.</p></CardContent></Card>}{visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>) }<Card className={`sticky bottom-3 z-20 rounded-3xl border text-white shadow-2xl backdrop-blur ${saveSuccess?"border-emerald-400/60 bg-emerald-950/95":"border-emerald-400/30 bg-slate-900/95"}`}><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-bold">{saveSuccess?"Saved successfully":"Ready to save?"}</div><div className="text-sm text-slate-300">{saveSuccess?"You can still change tips and save again before lockout.":`${draftCount}/${visibleGames.length} tips selected for this round.`}</div></div><Button onClick={saveAllTips} disabled={saving} className={`rounded-2xl px-6 py-4 text-base font-black text-slate-950 ${saveSuccess?"bg-emerald-300 hover:bg-emerald-200":"bg-emerald-400 hover:bg-emerald-300"}`}>{saving?"Saving...":saveSuccess?"✓ Saved - Save Again":"Save Tips"}</Button></CardContent></Card></div></section>}
 function GameTip({game,database,currentUser,draftTips,updateTip,saving}){const tip=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id); const result=getResult(game); const points=scoreTip(tip,result); const locked=isGameLocked(game,database.games); return <Card className="overflow-hidden rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-0"><div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center"><div><Badges game={game} locked={locked} result={result}/><div className="flex items-center gap-4"><TeamBadge team={game.home} logo={game.home_logo}/><h3 className="text-2xl font-bold">{game.home} <span className="text-slate-400">v</span> {game.away}</h3><TeamBadge team={game.away} logo={game.away_logo}/></div>{tip&&<p className="mt-2 text-sm text-slate-300">Selected tip: <strong className="text-white">{formatTip(tip)}</strong></p>}{result&&<p className="mt-1 text-sm text-slate-300">Your score for this game: <strong className="text-white">{points} points</strong></p>}</div><div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]"><PickButtons title="Winner" options={[game.home,game.away,"Draw"]} value={tip?.winner} disabled={locked||saving} onPick={winner=>updateTip(game.id,{winner})}/><PickButtons title={tip?.winner==="Draw"?"Margin not needed":"Margin"} options={["1-12","13+"]} value={tip?.winner==="Draw"?"":tip?.margin} disabled={locked||saving||tip?.winner==="Draw"} onPick={margin=>updateTip(game.id,{margin})}/></div></div></CardContent></Card>}
-function TeamBadge({team,logo}){const [bad,setBad]=React.useState(false); const src=getLogo(team,logo); if(src&&!bad) return <img src={src} onError={()=>setBad(true)} className="h-12 w-12 rounded-full bg-white/10 object-contain p-1" alt={`${team} logo`}/>; return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">{teamInitials(team)}</div>}
+function TeamBadge({team,logo}){const [bad,setBad]=React.useState(false); const src=getLogo(team,logo); React.useEffect(()=>{setBad(false)},[team,logo]); if(src&&!bad) return <img src={src} onError={()=>setBad(true)} className="h-12 w-12 rounded-full bg-white/10 object-contain p-1" alt={`${team} logo`}/>; return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">{teamInitials(team)}</div>}
 function Badges({game,locked,result}){return <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-slate-300"><span className="rounded-full bg-white/10 px-3 py-1">Round {game.round}</span><span>{getPrettyKickoff(game)}</span>{locked&&<span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-3 py-1 text-amber-200"><Lock className="h-3 w-3"/> Locked</span>}{result&&<span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-200"><CheckCircle2 className="h-3 w-3"/> {formatResult(result)}</span>}</div>}
 function PickButtons({title,options,value,disabled,onPick}){return <div className="rounded-2xl bg-slate-950/50 p-3"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</div><div className={`grid gap-2 ${options.length===3?"grid-cols-3":"grid-cols-2"}`}>{options.map(opt=><button key={opt} disabled={disabled} onClick={()=>onPick(opt)} className={`rounded-xl px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${value===opt?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-white/20"}`}>{opt}</button>)}</div></div>}
 function LeaderboardPanel({mode,selectedRound,leaderboard,weeklyLeaderboard,roundWinner,exportOverallLeaderboard,exportWeeklyLeaderboard}){const rows=mode==="weekly"?weeklyLeaderboard:leaderboard; return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">{mode==="weekly"?`Round ${selectedRound} leaderboard`:"Overall leaderboard"}</h2><p className="text-sm text-slate-300">10 points for picking a draw. 5 points for correct team + margin. 2 points for correct team only.</p></div><div className="flex items-center gap-3"><Button onClick={mode==="weekly"?exportWeeklyLeaderboard:exportOverallLeaderboard} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export CSV</Button><Trophy className="h-10 w-10 text-emerald-300"/></div></div>{mode==="weekly"&&roundWinner&&<div className="mb-5 rounded-3xl bg-emerald-400/15 p-5"><div className="text-sm uppercase tracking-wide text-emerald-200">Round winner</div><div className="mt-1 text-3xl font-black">{roundWinner.name}</div><div className="mt-1 text-slate-200">{roundWinner.total} points · {roundWinner.correctWinners} winners · {roundWinner.correctMargins} margins</div></div>}<Table rows={rows}/></CardContent></Card>}
