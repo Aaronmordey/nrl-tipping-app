@@ -23,9 +23,9 @@ const teamLogoMap = {
   "Broncos": wikiLogo("Brisbane Broncos logo.svg"),
   "Brisbane Broncos": wikiLogo("Brisbane Broncos logo.svg"),
 
-  "Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo.svg"),
-  "Canterbury Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo.svg"),
-  "Canterbury-Bankstown Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo.svg"),
+  "Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
+  "Canterbury Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
+  "Canterbury-Bankstown Bulldogs": wikiLogo("Canterbury-Bankstown Bulldogs logo 2026.svg"),
 
   "Cowboys": wikiLogo("North Queensland Cowboys logo.svg"),
   "North Queensland Cowboys": wikiLogo("North Queensland Cowboys logo.svg"),
@@ -46,25 +46,25 @@ const teamLogoMap = {
   "Panthers": wikiLogo("Penrith Panthers logo.svg"),
   "Penrith Panthers": wikiLogo("Penrith Panthers logo.svg"),
 
-  "Rabbitohs": wikiLogo("South Sydney Rabbitohs logo.svg"),
-  "South Sydney Rabbitohs": wikiLogo("South Sydney Rabbitohs logo.svg"),
+  "Rabbitohs": wikiLogo("South Sydney Rabbitohs Logo.svg"),
+  "South Sydney Rabbitohs": wikiLogo("South Sydney Rabbitohs Logo.svg"),
 
-  "Raiders": wikiLogo("Canberra Raiders logo.svg"),
-  "Canberra Raiders": wikiLogo("Canberra Raiders logo.svg"),
+  "Raiders": wikiLogo("Canberra Raiders Logo.svg"),
+  "Canberra Raiders": wikiLogo("Canberra Raiders Logo.svg"),
 
   "Roosters": wikiLogo("Sydney Roosters logo.svg"),
   "Sydney Roosters": wikiLogo("Sydney Roosters logo.svg"),
 
-  "Sea Eagles": wikiLogo("Manly Warringah Sea Eagles logo.svg"),
-  "Manly Sea Eagles": wikiLogo("Manly Warringah Sea Eagles logo.svg"),
-  "Manly-Warringah Sea Eagles": wikiLogo("Manly Warringah Sea Eagles logo.svg"),
+  "Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
+  "Manly Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
+  "Manly-Warringah Sea Eagles": wikiLogo("Manly-Warringah Sea Eagles logo.svg"),
 
   "Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
   "Cronulla Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
   "Cronulla-Sutherland Sharks": wikiLogo("Cronulla-Sutherland Sharks logo.svg"),
 
-  "Storm": wikiLogo("Melbourne Storm logo.svg"),
-  "Melbourne Storm": wikiLogo("Melbourne Storm logo.svg"),
+  "Storm": wikiLogo("Melbourne Storm Logo.svg"),
+  "Melbourne Storm": wikiLogo("Melbourne Storm Logo.svg"),
 
   "Titans": wikiLogo("Gold Coast Titans logo.svg"),
   "Gold Coast Titans": wikiLogo("Gold Coast Titans logo.svg"),
@@ -72,8 +72,8 @@ const teamLogoMap = {
   "Warriors": wikiLogo("New Zealand Warriors logo.svg"),
   "New Zealand Warriors": wikiLogo("New Zealand Warriors logo.svg"),
 
-  "Tigers": wikiLogo("Wests Tigers logo.svg"),
-  "Wests Tigers": wikiLogo("Wests Tigers logo.svg")
+  "Tigers": wikiLogo("Wests Tigers 2022 Logo.svg"),
+  "Wests Tigers": wikiLogo("Wests Tigers 2022 Logo.svg")
 };
 
 const previewDatabase = {
