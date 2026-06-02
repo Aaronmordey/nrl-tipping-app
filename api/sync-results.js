@@ -24,14 +24,14 @@ export default async function handler(req, res) {
 
     if (gameError) throw gameError;
 
-    const url = `https://www.thesportsdb.com/api/v2/json/schedule/league/${NRL_LEAGUE_ID}/${season}`;
-    const response = await fetch(url, {
-      headers: { "X-API-KEY": process.env.THESPORTSDB_API_KEY || "3" },
-    });
+    const apiKey = process.env.THESPORTSDB_API_KEY || "3";
+    const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${NRL_LEAGUE_ID}&s=${season}`;
 
+    const response = await fetch(url);
     if (!response.ok) throw new Error(`Sports API failed: ${response.status}`);
+
     const json = await response.json();
-    const events = json.schedule || json.events || json.event || [];
+    const events = json.events || [];
 
     let updated = 0;
 
