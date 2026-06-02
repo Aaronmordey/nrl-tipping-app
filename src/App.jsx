@@ -59,7 +59,7 @@ function scoreTip(tip,result){ if(!tip||!result) return 0; if(tip.winner!==resul
 function roundLockStarted(games,round){ const times=games.filter(g=>Number(g.round)===Number(round)).map(g=>g.kickoff_at?new Date(g.kickoff_at).getTime():null).filter(Boolean); return times.length?Date.now()>=Math.min(...times):false }
 function isGameLocked(game,games){ return game.locked || roundLockStarted(games,game.round) }
 function normalizeSportsEvent(event,season){ const home=event.strHomeTeam||event.strHome||"Home Team"; const away=event.strAwayTeam||event.strAway||"Away Team"; const hs=event.intHomeScore===null||event.intHomeScore===undefined||event.intHomeScore===""?null:Number(event.intHomeScore); const as=event.intAwayScore===null||event.intAwayScore===undefined||event.intAwayScore===""?null:Number(event.intAwayScore); const kickoff_at=parseSportsDate(event); return {external_id:String(event.idEvent),season:String(season||event.strSeason||new Date().getFullYear()),round:Number(event.intRound||event.intRoundNumber||1),kickoff:kickoff_at?getPrettyKickoff({kickoff_at}):(event.dateEvent||"TBC"),kickoff_at,home,away,venue:event.strVenue||null,home_logo:getLogo(home,event.strHomeTeamBadge),away_logo:getLogo(away,event.strAwayTeamBadge),locked:false,home_score:hs,away_score:as,status:hs!==null&&as!==null?"completed":"scheduled"}}
-function scoreRows(players,games,tips,round=null){ const scoped=round?games.filter(g=>Number(g.round)===Number(round)):games; return players.map(p=>{ const total=scoped.reduce((sum,g)=>sum+scoreTip(tips.find(t=>t.player_id===p.id&&t.game_id===g.id),getResult(g)),0); const submitted=scoped.filter(g=>tips.find(t=>t.player_id===p.id&&t.game_id===g.id)).length; const correctWinners=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner}).length; const correctMargins=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner&&tip.margin===r.margin}).length; return {...p,total,submitted,correctWinners,correctMargins}}).sort((a,b)=>b.total-a.total||b.correctWinners-a.correctWinners||b.submitted-a.submitted||a.name.localeCompare(b.name)) }
+function scoreRows(players,games,tips,round=null){ const scoped=round?games.filter(g=>Number(g.round)===Number(round)):games; return players.map(p=>{ const total=scoped.reduce((sum,g)=>sum+scoreTip(tips.find(t=>t.player_id===p.id&&t.game_id===g.id),getResult(g)),0); const submitted=scoped.filter(g=>tips.find(t=>t.player_id===p.id&&t.game_id===g.id)).length; const correctWinners=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner}).length; const correctMargins=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner&&tip.margin===r.margin}).length; return {...p,total,submitted,correctWinners,correctMargins}}).sort((a,b)=>b.total-a.total||b.correctWinners-a.correctWinners||b.submitted-a.submitted||String(a.name||"").localeCompare(String(b.name||""))) }
 
 export default function App(){
   const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
@@ -246,8 +246,8 @@ function HistoryPanel({roundSummaries,setSelectedRound,setActiveTab}){return <di
 
 function TipCheckPanel({database,visibleGames,selectedRound}){
   const roundGames = visibleGames;
-  const players = database.players.filter(p=>p.role!=="admin").sort((a,b)=>a.name.localeCompare(b.name));
-  const allPlayers = database.players.sort((a,b)=>a.name.localeCompare(b.name));
+  const players = database.players.filter(p=>p.role!=="admin").sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  const allPlayers = [...database.players].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
   const rows = allPlayers.map(player=>{
     const submitted = roundGames.filter(game=>database.tips.some(t=>t.player_id===player.id&&t.game_id===game.id)).length;
     const total = roundGames.length;
@@ -332,14 +332,17 @@ function TipCheckPanel({database,visibleGames,selectedRound}){
 }
 
 
+
 function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
-  const players=[...database.players].sort((a,b)=>a.name.localeCompare(b.name));
+  const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const adminCount=players.filter(p=>p.role==="admin").length;
   const playerCount=players.filter(p=>p.role!=="admin").length;
 
+  function displayName(player){return player.name || player.email || "Unnamed player"}
+  function displayEmail(player){return player.email || "No email"}
   function getStats(player){
-    const row=leaderboard.find(r=>r.id===player.id);
-    const totalTips=database.tips.filter(t=>t.player_id===player.id).length;
+    const row=(leaderboard||[]).find(r=>r.id===player.id);
+    const totalTips=(database.tips||[]).filter(t=>t.player_id===player.id).length;
     return {points:row?.total||0,totalTips};
   }
 
@@ -374,10 +377,10 @@ function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
             return <div key={player.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-bold">{player.name}</div>
-                  <div className="text-sm text-slate-300">{player.email}</div>
+                  <div className="font-bold">{displayName(player)}</div>
+                  <div className="text-sm text-slate-300">{displayEmail(player)}</div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role}</span>
+                <span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role||"player"}</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm">
                 <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.points}</div><div className="text-slate-400">Points</div></div>
@@ -400,9 +403,9 @@ function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
             <tbody>{players.map(player=>{
               const stats=getStats(player);
               return <tr key={player.id} className="border-t border-white/10">
-                <td className="px-4 py-4 font-bold">{player.name}</td>
-                <td className="px-4 py-4 text-slate-300">{player.email}</td>
-                <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role}</span></td>
+                <td className="px-4 py-4 font-bold">{displayName(player)}</td>
+                <td className="px-4 py-4 text-slate-300">{displayEmail(player)}</td>
+                <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role||"player"}</span></td>
                 <td className="px-4 py-4 text-slate-300">{stats.totalTips}</td>
                 <td className="px-4 py-4 text-emerald-300 font-bold">{stats.points}</td>
                 <td className="px-4 py-4 text-right">{player.role==="admin"
