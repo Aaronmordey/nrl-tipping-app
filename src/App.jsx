@@ -123,7 +123,30 @@ export default function App(){
     setNotice("Password updated. You can now log in with your new password.");
     setSaving(false);
   }
-  function updateTip(gameId,update){
+  
+  async function updatePlayerRole(playerId,role){
+    if(!isAdmin)return;
+    const target=database.players.find(p=>p.id===playerId);
+    if(!target)return;
+    if(target.id===currentUser.id&&role!=="admin"){
+      const ok=window.confirm("You are about to demote yourself from admin. You may lose admin access. Continue?");
+      if(!ok)return;
+    }
+    setSaving(true); setAuthError(""); setNotice("");
+    if(!hasSupabase){
+      setDatabase({...database,players:database.players.map(p=>p.id===playerId?{...p,role}:p)});
+      setNotice(`${target.name||target.email||"Player"} is now ${role}.`);
+      setSaving(false);
+      return;
+    }
+    const {error}=await supabase.from("profiles").update({role}).eq("id",playerId);
+    if(error)setAuthError(error.message);
+    else setNotice(`${target.name||target.email||"Player"} is now ${role}.`);
+    await refreshSupabaseData(currentUser);
+    setSaving(false);
+  }
+
+function updateTip(gameId,update){
     setSaveSuccess(false);
     if(!currentUser)return;
     const game=database.games.find(g=>g.id===gameId);
