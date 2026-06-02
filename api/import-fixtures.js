@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const round = String(req.query.round || "");
 
     if (!round) {
-      return res.status(400).json({ ok: false, error: "Round is required for NRL website scraping." });
+      return res.status(400).json({ ok: false, error: "Round is required." });
     }
 
     const rows = await fetchNrlRound(season, round);
