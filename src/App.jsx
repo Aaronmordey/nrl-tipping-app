@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock, ClipboardList, Trash2 } from "lucide-react";
+import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock, ClipboardList, Trash2, UserCog } from "lucide-react";
 import { motion } from "framer-motion";
 
 function Button({ className = "", children, ...props }) {
@@ -218,6 +218,7 @@ export default function App(){
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound}/>} 
+    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} updatePlayerRole={updatePlayerRole} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} saving={saving}/>} 
   </main></div>;
 }
@@ -232,7 +233,7 @@ function Input({label,value,onChange,placeholder,type="text"}){return <label cla
 function Header({currentUser,isAdmin,database,completedGames,selectedRound,roundLocked,logout}){return <motion.header initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between"><div><div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200"><Trophy className="h-4 w-4"/> NRL Tipping Comp</div><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Footy tips, margins and leaderboard</h1><p className="mt-2 max-w-2xl text-slate-300">Logged in as <strong className="text-white">{currentUser.name}</strong> · {isAdmin?"Admin":"Player"} · Round {selectedRound} {roundLocked?"is locked":"is open"}</p></div><div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center"><Card className="border-white/10 bg-white/10 text-white"><CardContent className="p-4"><div className="grid grid-cols-3 gap-4 text-center"><Stat n={database.players.length} t="Players"/><Stat n={database.games.length} t="Games"/><Stat n={completedGames} t="Done"/></div></CardContent></Card><Button onClick={logout} className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200"><LogOut className="mr-2 h-4 w-4"/> Logout</Button></div></motion.header>}
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
 function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2">{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
-function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-6":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
+function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
 function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length; const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length; const remaining=Math.max(visibleGames.length-draftCount,0); return <section className="grid gap-5 lg:grid-cols-[280px_1fr]"><Card className="border-white/10 bg-white/10 text-white rounded-3xl"><CardContent className="p-5"><h2 className="mb-3 text-lg font-bold">Your tips</h2><p className="text-sm text-slate-300">Pick every game, then press Save Tips at the bottom.</p><div className="mt-5 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Saved tips</div><div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Tips remaining</div><div className="mt-1 text-3xl font-bold text-amber-300">{remaining}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Current points</div><div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div></div></CardContent></Card><div className="grid gap-4">{saveSuccess&&<Card className="rounded-3xl border border-emerald-400/40 bg-emerald-400/15 text-white"><CardContent className="p-5 text-center"><div className="text-3xl font-black text-emerald-300">✓ Tips saved!</div><p className="mt-2 text-sm text-emerald-100">Your tips for this round have been saved successfully.</p></CardContent></Card>}{visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>) }<Card className={`sticky bottom-3 z-20 rounded-3xl border text-white shadow-2xl backdrop-blur ${saveSuccess?"border-emerald-400/60 bg-emerald-950/95":"border-emerald-400/30 bg-slate-900/95"}`}><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-bold">{saveSuccess?"Saved successfully":"Ready to save?"}</div><div className="text-sm text-slate-300">{saveSuccess?"You can still change tips and save again before lockout.":`${draftCount}/${visibleGames.length} tips selected for this round.`}</div></div><Button onClick={saveAllTips} disabled={saving} className={`rounded-2xl px-6 py-4 text-base font-black text-slate-950 ${saveSuccess?"bg-emerald-300 hover:bg-emerald-200":"bg-emerald-400 hover:bg-emerald-300"}`}>{saving?"Saving...":saveSuccess?"✓ Saved - Save Again":"Save Tips"}</Button></CardContent></Card></div></section>}
 function GameTip({game,database,currentUser,draftTips,updateTip,saving}){const tip=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id); const result=getResult(game); const points=scoreTip(tip,result); const locked=isGameLocked(game,database.games); return <Card className="overflow-hidden rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-0"><div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center"><div><Badges game={game} locked={locked} result={result}/><div className="flex items-center gap-4"><TeamBadge team={game.home} logo={game.home_logo}/><h3 className="text-2xl font-bold">{game.home} <span className="text-slate-400">v</span> {game.away}</h3><TeamBadge team={game.away} logo={game.away_logo}/></div>{tip&&<p className="mt-2 text-sm text-slate-300">Selected tip: <strong className="text-white">{tip.winner}</strong> by <strong className="text-white">{tip.margin}</strong></p>}{result&&<p className="mt-1 text-sm text-slate-300">Your score for this game: <strong className="text-white">{points} points</strong></p>}</div><div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]"><PickButtons title="Winner" options={[game.home,game.away]} value={tip?.winner} disabled={locked||saving} onPick={winner=>updateTip(game.id,{winner})}/><PickButtons title="Margin" options={["1-12","13+"]} value={tip?.margin} disabled={locked||saving} onPick={margin=>updateTip(game.id,{margin})}/></div></div></CardContent></Card>}
 function TeamBadge({team,logo}){const [bad,setBad]=React.useState(false); const src=getLogo(team,logo); if(src&&!bad) return <img src={src} onError={()=>setBad(true)} className="h-12 w-12 rounded-full bg-white/10 object-contain p-1" alt={`${team} logo`}/>; return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">{teamInitials(team)}</div>}
@@ -323,6 +324,92 @@ function TipCheckPanel({database,visibleGames,selectedRound}){
               <td className="px-4 py-4 text-slate-300">{player.missing}</td>
               <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.complete?"bg-emerald-400 text-slate-950":"bg-amber-400 text-slate-950"}`}>{player.complete?"Complete":"Incomplete"}</span></td>
             </tr>)}</tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  </section>
+}
+
+
+function PlayerManagementPanel({database,leaderboard,updatePlayerRole,saving}){
+  const players=[...database.players].sort((a,b)=>a.name.localeCompare(b.name));
+  const adminCount=players.filter(p=>p.role==="admin").length;
+  const playerCount=players.filter(p=>p.role!=="admin").length;
+
+  function getStats(player){
+    const row=leaderboard.find(r=>r.id===player.id);
+    const totalTips=database.tips.filter(t=>t.player_id===player.id).length;
+    return {points:row?.total||0,totalTips};
+  }
+
+  return <section className="grid gap-5 lg:grid-cols-[320px_1fr]">
+    <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-5">
+        <h2 className="text-xl font-bold">Player management</h2>
+        <p className="mt-2 text-sm text-slate-300">View users and manage admin access. Player history is kept safe.</p>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-slate-950/60 p-4 text-center">
+            <div className="text-3xl font-black text-emerald-300">{playerCount}</div>
+            <div className="text-sm text-slate-400">Players</div>
+          </div>
+          <div className="rounded-2xl bg-slate-950/60 p-4 text-center">
+            <div className="text-3xl font-black text-sky-300">{adminCount}</div>
+            <div className="text-sm text-slate-400">Admins</div>
+          </div>
+        </div>
+        <div className="mt-5 rounded-2xl bg-slate-950/60 p-4 text-sm text-slate-300">
+          Tip: avoid deleting users because it can affect old tips and leaderboard history. Promote/demote roles here instead.
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-5">
+        <h2 className="mb-5 text-2xl font-bold">Registered users</h2>
+
+        <div className="grid gap-3 md:hidden">
+          {players.map(player=>{
+            const stats=getStats(player);
+            return <div key={player.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-bold">{player.name}</div>
+                  <div className="text-sm text-slate-300">{player.email}</div>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm">
+                <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.points}</div><div className="text-slate-400">Points</div></div>
+                <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.totalTips}</div><div className="text-slate-400">Tips</div></div>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {player.role==="admin"
+                  ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-2xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote to player</Button>
+                  : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote to admin</Button>}
+              </div>
+            </div>
+          })}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+          <table className="w-full border-collapse text-left">
+            <thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400">
+              <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Tips</th><th className="px-4 py-3">Points</th><th className="px-4 py-3 text-right">Action</th></tr>
+            </thead>
+            <tbody>{players.map(player=>{
+              const stats=getStats(player);
+              return <tr key={player.id} className="border-t border-white/10">
+                <td className="px-4 py-4 font-bold">{player.name}</td>
+                <td className="px-4 py-4 text-slate-300">{player.email}</td>
+                <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role}</span></td>
+                <td className="px-4 py-4 text-slate-300">{stats.totalTips}</td>
+                <td className="px-4 py-4 text-emerald-300 font-bold">{stats.points}</td>
+                <td className="px-4 py-4 text-right">{player.role==="admin"
+                  ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote</Button>
+                  : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote</Button>}</td>
+              </tr>
+            })}</tbody>
           </table>
         </div>
       </CardContent>
