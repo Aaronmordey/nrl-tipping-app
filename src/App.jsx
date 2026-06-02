@@ -61,12 +61,92 @@ function isGameLocked(game,games){ return game.locked || roundLockStarted(games,
 function normalizeSportsEvent(event,season){ const home=event.strHomeTeam||event.strHome||"Home Team"; const away=event.strAwayTeam||event.strAway||"Away Team"; const hs=event.intHomeScore===null||event.intHomeScore===undefined||event.intHomeScore===""?null:Number(event.intHomeScore); const as=event.intAwayScore===null||event.intAwayScore===undefined||event.intAwayScore===""?null:Number(event.intAwayScore); const kickoff_at=parseSportsDate(event); return {external_id:String(event.idEvent),season:String(season||event.strSeason||new Date().getFullYear()),round:Number(event.intRound||event.intRoundNumber||1),kickoff:kickoff_at?getPrettyKickoff({kickoff_at}):(event.dateEvent||"TBC"),kickoff_at,home,away,venue:event.strVenue||null,home_logo:getLogo(home,event.strHomeTeamBadge),away_logo:getLogo(away,event.strAwayTeamBadge),locked:false,home_score:hs,away_score:as,status:hs!==null&&as!==null?"completed":"scheduled"}}
 function scoreRows(players,games,tips,round=null){ const scoped=round?games.filter(g=>Number(g.round)===Number(round)):games; return players.map(p=>{ const total=scoped.reduce((sum,g)=>sum+scoreTip(tips.find(t=>t.player_id===p.id&&t.game_id===g.id),getResult(g)),0); const submitted=scoped.filter(g=>tips.find(t=>t.player_id===p.id&&t.game_id===g.id)).length; const correctWinners=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner}).length; const correctMargins=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner&&tip.margin===r.margin}).length; return {...p,total,submitted,correctWinners,correctMargins}}).sort((a,b)=>b.total-a.total||b.correctWinners-a.correctWinners||b.submitted-a.submitted||String(a.name||"").localeCompare(String(b.name||""))) }
 
+function csvEscape(value){
+  const v=value===null||value===undefined?"":String(value);
+  if(/[",\n\r]/.test(v)) return `"${v.replace(/"/g,'""')}"`;
+  return v;
+}
+function downloadCsv(filename,headers,rows){
+  const csv=[headers.map(csvEscape).join(","),...rows.map(row=>headers.map(h=>csvEscape(row[h])).join(","))].join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
 export default function App(){
   const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
   const currentUser=database.currentUser; const isAdmin=currentUser?.role==="admin";
   const rounds=useMemo(()=>{const list=[...new Set(database.games.map(g=>Number(g.round)).filter(Boolean))].sort((a,b)=>a-b); return list.length?list:[1]},[database.games]);
   const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>new Date(a.kickoff_at||0)-new Date(b.kickoff_at||0));
   const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound);
+
+
+  function exportOverallLeaderboard(){
+    const rows=leaderboard.map((p,i)=>({
+      Rank:i+1,
+      Name:p.name,
+      Email:p.email,
+      Role:p.role,
+      Tips:p.submitted,
+      Winners:p.correctWinners,
+      Margins:p.correctMargins,
+      Points:p.total
+    }));
+    downloadCsv("overall-leaderboard.csv",["Rank","Name","Email","Role","Tips","Winners","Margins","Points"],rows);
+  }
+
+  function exportWeeklyLeaderboard(){
+    const rows=weeklyLeaderboard.map((p,i)=>({
+      Rank:i+1,
+      Round:selectedRound,
+      Name:p.name,
+      Email:p.email,
+      Role:p.role,
+      Tips:p.submitted,
+      Winners:p.correctWinners,
+      Margins:p.correctMargins,
+      Points:p.total
+    }));
+    downloadCsv(`round-${selectedRound}-leaderboard.csv`,["Rank","Round","Name","Email","Role","Tips","Winners","Margins","Points"],rows);
+  }
+
+  function exportPlayers(){
+    const rows=database.players.map(p=>{
+      const row=leaderboard.find(r=>r.id===p.id)||{};
+      return {
+        Name:p.name,
+        Email:p.email,
+        Role:p.role,
+        TotalTips:database.tips.filter(t=>t.player_id===p.id).length,
+        Points:row.total||0
+      };
+    });
+    downloadCsv("players.csv",["Name","Email","Role","TotalTips","Points"],rows);
+  }
+
+  function exportTipCheck(){
+    const rows=database.players.map(p=>{
+      const submitted=visibleGames.filter(g=>database.tips.some(t=>t.player_id===p.id&&t.game_id===g.id)).length;
+      const total=visibleGames.length;
+      return {
+        Round:selectedRound,
+        Name:p.name,
+        Email:p.email,
+        Role:p.role,
+        Submitted:submitted,
+        Missing:Math.max(total-submitted,0),
+        Status:total>0&&submitted===total?"Complete":"Incomplete"
+      };
+    });
+    downloadCsv(`round-${selectedRound}-tip-check.csv`,["Round","Name","Email","Role","Submitted","Missing","Status"],rows);
+  }
 
   async function refreshSupabaseData(userProfile=currentUser){ if(!supabase||!userProfile)return; setLoading(true); const [{data:profiles,error:pe},{data:games,error:ge},{data:tips,error:te}]=await Promise.all([supabase.from("profiles").select("id,name,email,role").order("name"),supabase.from("games").select("*").order("round").order("kickoff_at",{nullsFirst:false}),supabase.from("tips").select("id,player_id,game_id,winner,margin,updated_at")]); if(pe||ge||te){setAuthError(pe?.message||ge?.message||te?.message||"Could not load database."); setLoading(false); return} const fresh=profiles.find(p=>p.id===userProfile.id)||userProfile; setDatabase({currentUser:fresh,players:profiles||[],games:games||[],tips:tips||[]}); setLoading(false) }
   useEffect(()=>{async function boot(){
@@ -262,9 +342,9 @@ function updateTip(gameId,update){
     <RoundSelector rounds={rounds} selectedRound={selectedRound} setSelectedRound={setSelectedRound} roundLocked={roundLocked}/>
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
-    {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
-    {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound}/>} 
-    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerRole={updatePlayerRole} saving={saving}/>} 
+    {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
+    {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
+    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} saving={saving}/>} 
   </main></div>;
 }
@@ -285,12 +365,12 @@ function GameTip({game,database,currentUser,draftTips,updateTip,saving}){const t
 function TeamBadge({team,logo}){const [bad,setBad]=React.useState(false); const src=getLogo(team,logo); if(src&&!bad) return <img src={src} onError={()=>setBad(true)} className="h-12 w-12 rounded-full bg-white/10 object-contain p-1" alt={`${team} logo`}/>; return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">{teamInitials(team)}</div>}
 function Badges({game,locked,result}){return <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-slate-300"><span className="rounded-full bg-white/10 px-3 py-1">Round {game.round}</span><span>{getPrettyKickoff(game)}</span>{locked&&<span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-3 py-1 text-amber-200"><Lock className="h-3 w-3"/> Locked</span>}{result&&<span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-200"><CheckCircle2 className="h-3 w-3"/> {result.winner} by {result.marginPoints}</span>}</div>}
 function PickButtons({title,options,value,disabled,onPick}){return <div className="rounded-2xl bg-slate-950/50 p-3"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</div><div className="grid grid-cols-2 gap-2">{options.map(opt=><button key={opt} disabled={disabled} onClick={()=>onPick(opt)} className={`rounded-xl px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${value===opt?"bg-emerald-400 text-slate-950":"bg-white/10 text-white hover:bg-white/20"}`}>{opt}</button>)}</div></div>}
-function LeaderboardPanel({mode,selectedRound,leaderboard,weeklyLeaderboard,roundWinner}){const rows=mode==="weekly"?weeklyLeaderboard:leaderboard; return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">{mode==="weekly"?`Round ${selectedRound} leaderboard`:"Overall leaderboard"}</h2><p className="text-sm text-slate-300">5 points for correct team + margin. 2 points for correct team only.</p></div><Trophy className="h-10 w-10 text-emerald-300"/></div>{mode==="weekly"&&roundWinner&&<div className="mb-5 rounded-3xl bg-emerald-400/15 p-5"><div className="text-sm uppercase tracking-wide text-emerald-200">Round winner</div><div className="mt-1 text-3xl font-black">{roundWinner.name}</div><div className="mt-1 text-slate-200">{roundWinner.total} points · {roundWinner.correctWinners} winners · {roundWinner.correctMargins} margins</div></div>}<Table rows={rows}/></CardContent></Card>}
+function LeaderboardPanel({mode,selectedRound,leaderboard,weeklyLeaderboard,roundWinner,exportOverallLeaderboard,exportWeeklyLeaderboard}){const rows=mode==="weekly"?weeklyLeaderboard:leaderboard; return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">{mode==="weekly"?`Round ${selectedRound} leaderboard`:"Overall leaderboard"}</h2><p className="text-sm text-slate-300">5 points for correct team + margin. 2 points for correct team only.</p></div><div className="flex items-center gap-3"><Button onClick={mode==="weekly"?exportWeeklyLeaderboard:exportOverallLeaderboard} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export CSV</Button><Trophy className="h-10 w-10 text-emerald-300"/></div></div>{mode==="weekly"&&roundWinner&&<div className="mb-5 rounded-3xl bg-emerald-400/15 p-5"><div className="text-sm uppercase tracking-wide text-emerald-200">Round winner</div><div className="mt-1 text-3xl font-black">{roundWinner.name}</div><div className="mt-1 text-slate-200">{roundWinner.total} points · {roundWinner.correctWinners} winners · {roundWinner.correctMargins} margins</div></div>}<Table rows={rows}/></CardContent></Card>}
 function Table({rows}){return <><div className="grid gap-3 md:hidden">{rows.map((p,i)=><div key={p.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-sm text-slate-400">#{i+1}</div><div className="text-lg font-bold">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</div></div><div className="text-3xl font-black text-emerald-300">{p.total}</div></div><div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm"><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.submitted}</div><div className="text-slate-400">Tips</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctWinners}</div><div className="text-slate-400">Winners</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctMargins}</div><div className="text-slate-400">Margins</div></div></div></div>)}</div><div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block"><table className="w-full border-collapse text-left"><thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-3">Rank</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Tips</th><th className="px-4 py-3">Winners</th><th className="px-4 py-3">Margins</th><th className="px-4 py-3 text-right">Points</th></tr></thead><tbody>{rows.map((p,i)=><tr key={p.id} className="border-t border-white/10"><td className="px-4 py-4 font-bold">#{i+1}</td><td className="px-4 py-4">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</td><td className="px-4 py-4 text-slate-300">{p.submitted}</td><td className="px-4 py-4 text-slate-300">{p.correctWinners}</td><td className="px-4 py-4 text-slate-300">{p.correctMargins}</td><td className="px-4 py-4 text-right text-xl font-bold text-emerald-300">{p.total}</td></tr>)}</tbody></table></div></>}
 
 function HistoryPanel({roundSummaries,setSelectedRound,setActiveTab}){return <div className="grid gap-4">{roundSummaries.map(summary=><Card key={summary.round} className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">Round {summary.round}</h2><p className="text-sm text-slate-300">{summary.completed}/{summary.games} games completed</p>{summary.winner&&<p className="mt-2 text-emerald-200">Leader: <strong>{summary.winner.name}</strong> · {summary.winner.total} points</p>}</div><div className="flex gap-2"><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("weekly")}} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">View weekly ladder</Button><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("tips")}} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">View games</Button></div></div><div className="mt-4 grid gap-2 sm:grid-cols-3">{summary.rows.slice(0,3).map((p,i)=><div key={p.id} className="rounded-2xl bg-slate-950/50 p-3"><div className="text-sm text-slate-400">#{i+1}</div><div className="font-bold">{p.name}</div><div className="text-emerald-300">{p.total} pts</div></div>)}</div></CardContent></Card>)}</div>}
 
-function TipCheckPanel({database,visibleGames,selectedRound}){
+function TipCheckPanel({database,visibleGames,selectedRound,exportTipCheck}){
   const roundGames = visibleGames;
   const players = database.players.filter(p=>p.role!=="admin").sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
   const allPlayers = [...database.players].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
@@ -331,7 +411,7 @@ function TipCheckPanel({database,visibleGames,selectedRound}){
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
           <div className="mb-2 text-sm font-bold text-slate-200">Reminder message</div>
           <p className="text-sm text-slate-300">{reminderText}</p>
-          <Button onClick={copyReminder} className="mt-4 w-full rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Copy reminder</Button>
+          <Button onClick={copyReminder} className="mt-4 w-full rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Copy reminder</Button><Button onClick={exportTipCheck} className="mt-3 w-full rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export tip check CSV</Button>
         </div>
       </CardContent>
     </Card>
@@ -379,7 +459,7 @@ function TipCheckPanel({database,visibleGames,selectedRound}){
 
 
 
-function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerRole,saving}){
+function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerRole,exportPlayers,saving}){
   const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const adminCount=players.filter(p=>p.role==="admin").length;
   const playerCount=players.filter(p=>p.role!=="admin").length;
@@ -421,7 +501,7 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
 
     <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
       <CardContent className="p-5">
-        <h2 className="mb-5 text-2xl font-bold">Registered users</h2>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-2xl font-bold">Registered users</h2><Button onClick={exportPlayers} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export CSV</Button></div>
 
         <div className="grid gap-3 md:hidden">
           {players.map(player=>{
