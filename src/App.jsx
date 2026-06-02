@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock } from "lucide-react";
+import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock, ClipboardList } from "lucide-react";
 import { motion } from "framer-motion";
 
 function Button({ className = "", children, ...props }) {
@@ -92,6 +92,7 @@ export default function App(){
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} leaderboard={leaderboard} updateTip={updateTip} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
+    {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} saving={saving}/>} 
   </main></div>;
 }
@@ -102,7 +103,7 @@ function Input({label,value,onChange,placeholder,type="text"}){return <label cla
 function Header({currentUser,isAdmin,database,completedGames,selectedRound,roundLocked,logout}){return <motion.header initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between"><div><div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200"><Trophy className="h-4 w-4"/> NRL Tipping Comp</div><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Footy tips, margins and leaderboard</h1><p className="mt-2 max-w-2xl text-slate-300">Logged in as <strong className="text-white">{currentUser.name}</strong> · {isAdmin?"Admin":"Player"} · Round {selectedRound} {roundLocked?"is locked":"is open"}</p></div><div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center"><Card className="border-white/10 bg-white/10 text-white"><CardContent className="p-4"><div className="grid grid-cols-3 gap-4 text-center"><Stat n={database.players.length} t="Players"/><Stat n={database.games.length} t="Games"/><Stat n={completedGames} t="Done"/></div></CardContent></Card><Button onClick={logout} className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200"><LogOut className="mr-2 h-4 w-4"/> Logout</Button></div></motion.header>}
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
 function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2">{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
-function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-5":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
+function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-6":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
 function TipsPanel({visibleGames,database,currentUser,playerTips,leaderboard,updateTip,saving}){return <section className="grid gap-5 lg:grid-cols-[280px_1fr]"><Card className="border-white/10 bg-white/10 text-white rounded-3xl"><CardContent className="p-5"><h2 className="mb-3 text-lg font-bold">Your tips</h2><p className="text-sm text-slate-300">The whole round locks as soon as the first game starts.</p><div className="mt-5 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Round tips submitted</div><div className="mt-1 text-3xl font-bold">{visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length}/{visibleGames.length}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Current points</div><div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div></div></CardContent></Card><div className="grid gap-4">{visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} updateTip={updateTip} saving={saving}/>)}</div></section>}
 function GameTip({game,database,currentUser,updateTip,saving}){const tip=database.tips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id); const result=getResult(game); const points=scoreTip(tip,result); const locked=isGameLocked(game,database.games); return <Card className="overflow-hidden rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-0"><div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center"><div><Badges game={game} locked={locked} result={result}/><div className="flex items-center gap-4"><TeamBadge team={game.home} logo={game.home_logo}/><h3 className="text-2xl font-bold">{game.home} <span className="text-slate-400">v</span> {game.away}</h3><TeamBadge team={game.away} logo={game.away_logo}/></div>{tip&&<p className="mt-2 text-sm text-slate-300">Your tip: <strong className="text-white">{tip.winner}</strong> by <strong className="text-white">{tip.margin}</strong></p>}{result&&<p className="mt-1 text-sm text-slate-300">Your score for this game: <strong className="text-white">{points} points</strong></p>}</div><div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]"><PickButtons title="Winner" options={[game.home,game.away]} value={tip?.winner} disabled={locked||saving} onPick={winner=>updateTip(game.id,{winner})}/><PickButtons title="Margin" options={["1-12","13+"]} value={tip?.margin} disabled={locked||saving} onPick={margin=>updateTip(game.id,{margin})}/></div></div></CardContent></Card>}
 function TeamBadge({team,logo}){const [bad,setBad]=React.useState(false); const src=getLogo(team,logo); if(src&&!bad) return <img src={src} onError={()=>setBad(true)} className="h-12 w-12 rounded-full bg-white/10 object-contain p-1" alt={`${team} logo`}/>; return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">{teamInitials(team)}</div>}
@@ -112,5 +113,93 @@ function LeaderboardPanel({mode,selectedRound,leaderboard,weeklyLeaderboard,roun
 function Table({rows}){return <><div className="grid gap-3 md:hidden">{rows.map((p,i)=><div key={p.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-sm text-slate-400">#{i+1}</div><div className="text-lg font-bold">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</div></div><div className="text-3xl font-black text-emerald-300">{p.total}</div></div><div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm"><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.submitted}</div><div className="text-slate-400">Tips</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctWinners}</div><div className="text-slate-400">Winners</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctMargins}</div><div className="text-slate-400">Margins</div></div></div></div>)}</div><div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block"><table className="w-full border-collapse text-left"><thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-3">Rank</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Tips</th><th className="px-4 py-3">Winners</th><th className="px-4 py-3">Margins</th><th className="px-4 py-3 text-right">Points</th></tr></thead><tbody>{rows.map((p,i)=><tr key={p.id} className="border-t border-white/10"><td className="px-4 py-4 font-bold">#{i+1}</td><td className="px-4 py-4">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</td><td className="px-4 py-4 text-slate-300">{p.submitted}</td><td className="px-4 py-4 text-slate-300">{p.correctWinners}</td><td className="px-4 py-4 text-slate-300">{p.correctMargins}</td><td className="px-4 py-4 text-right text-xl font-bold text-emerald-300">{p.total}</td></tr>)}</tbody></table></div></>}
 
 function HistoryPanel({roundSummaries,setSelectedRound,setActiveTab}){return <div className="grid gap-4">{roundSummaries.map(summary=><Card key={summary.round} className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">Round {summary.round}</h2><p className="text-sm text-slate-300">{summary.completed}/{summary.games} games completed</p>{summary.winner&&<p className="mt-2 text-emerald-200">Leader: <strong>{summary.winner.name}</strong> · {summary.winner.total} points</p>}</div><div className="flex gap-2"><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("weekly")}} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">View weekly ladder</Button><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("tips")}} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">View games</Button></div></div><div className="mt-4 grid gap-2 sm:grid-cols-3">{summary.rows.slice(0,3).map((p,i)=><div key={p.id} className="rounded-2xl bg-slate-950/50 p-3"><div className="text-sm text-slate-400">#{i+1}</div><div className="font-bold">{p.name}</div><div className="text-emerald-300">{p.total} pts</div></div>)}</div></CardContent></Card>)}</div>}
+
+function TipCheckPanel({database,visibleGames,selectedRound}){
+  const roundGames = visibleGames;
+  const players = database.players.filter(p=>p.role!=="admin").sort((a,b)=>a.name.localeCompare(b.name));
+  const allPlayers = database.players.sort((a,b)=>a.name.localeCompare(b.name));
+  const rows = allPlayers.map(player=>{
+    const submitted = roundGames.filter(game=>database.tips.some(t=>t.player_id===player.id&&t.game_id===game.id)).length;
+    const total = roundGames.length;
+    const missing = Math.max(total-submitted,0);
+    const complete = total>0 && submitted===total;
+    return {...player, submitted, total, missing, complete};
+  });
+  const completeCount = rows.filter(r=>r.complete).length;
+  const incompleteRows = rows.filter(r=>!r.complete);
+  const missingNames = incompleteRows.map(r=>`${r.name} (${r.missing} missing)`).join(", ");
+  const reminderText = incompleteRows.length
+    ? `Reminder: please submit your Round ${selectedRound} tips. Still missing: ${missingNames}.`
+    : `Everyone has submitted their Round ${selectedRound} tips.`;
+
+  async function copyReminder(){
+    try{ await navigator.clipboard.writeText(reminderText); alert("Reminder copied."); }
+    catch{ alert(reminderText); }
+  }
+
+  return <section className="grid gap-5 lg:grid-cols-[320px_1fr]">
+    <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-5">
+        <h2 className="text-xl font-bold">Who has tipped?</h2>
+        <p className="mt-2 text-sm text-slate-300">Round {selectedRound} tip check for all registered players.</p>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-slate-950/60 p-4 text-center">
+            <div className="text-3xl font-black text-emerald-300">{completeCount}</div>
+            <div className="text-sm text-slate-400">Complete</div>
+          </div>
+          <div className="rounded-2xl bg-slate-950/60 p-4 text-center">
+            <div className="text-3xl font-black text-amber-300">{Math.max(rows.length-completeCount,0)}</div>
+            <div className="text-sm text-slate-400">Incomplete</div>
+          </div>
+        </div>
+        <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
+          <div className="mb-2 text-sm font-bold text-slate-200">Reminder message</div>
+          <p className="text-sm text-slate-300">{reminderText}</p>
+          <Button onClick={copyReminder} className="mt-4 w-full rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Copy reminder</Button>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-5">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Round {selectedRound} submissions</h2>
+            <p className="text-sm text-slate-300">{roundGames.length} games in this round.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:hidden">
+          {rows.map(player=><div key={player.id} className={`rounded-2xl border p-4 ${player.complete?"border-emerald-400/20 bg-emerald-400/10":"border-amber-400/20 bg-amber-400/10"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-bold">{player.name} {player.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</div>
+                <div className="text-sm text-slate-300">{player.email}</div>
+              </div>
+              <div className={`rounded-full px-3 py-1 text-sm font-bold ${player.complete?"bg-emerald-400 text-slate-950":"bg-amber-400 text-slate-950"}`}>{player.complete?"Done":"Missing"}</div>
+            </div>
+            <div className="mt-3 text-sm text-slate-300">{player.submitted}/{player.total} tips submitted</div>
+          </div>)}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+          <table className="w-full border-collapse text-left">
+            <thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400">
+              <tr><th className="px-4 py-3">Player</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Submitted</th><th className="px-4 py-3">Missing</th><th className="px-4 py-3">Status</th></tr>
+            </thead>
+            <tbody>{rows.map(player=><tr key={player.id} className="border-t border-white/10">
+              <td className="px-4 py-4 font-bold">{player.name} {player.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</td>
+              <td className="px-4 py-4 text-slate-300">{player.email}</td>
+              <td className="px-4 py-4 text-slate-300">{player.submitted}/{player.total}</td>
+              <td className="px-4 py-4 text-slate-300">{player.missing}</td>
+              <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.complete?"bg-emerald-400 text-slate-950":"bg-amber-400 text-slate-950"}`}>{player.complete?"Complete":"Incomplete"}</span></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  </section>
+}
+
 function AdminPanel({visibleGames,database,selectedRound,importSeason,setImportSeason,importRound,setImportRound,importFixtures,syncResults,addFixture,toggleLockRound,updateGame,saving}){return <section className="grid gap-5 lg:grid-cols-[320px_1fr]"><Card className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><h2 className="text-xl font-bold">Admin controls</h2><p className="mt-2 text-sm text-slate-300">Paste/import fixtures, enter results, and manage round lockout.</p><div className="mt-5 grid gap-3"><Input label="Season" value={importSeason} onChange={setImportSeason}/><Input label="Round" value={importRound} onChange={setImportRound}/><a href="/api/paste-fixtures" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-2 font-semibold text-slate-950 hover:bg-emerald-300"><Download className="mr-2 h-4 w-4"/> Paste fixtures</a><Button onClick={importFixtures} disabled={saving} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Try auto import</Button><Button onClick={syncResults} disabled={saving} className="rounded-2xl bg-violet-400 text-slate-950 hover:bg-violet-300"><RefreshCw className="mr-2 h-4 w-4"/> Sync results</Button><Button onClick={addFixture} disabled={saving} className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200"><UserPlus className="mr-2 h-4 w-4"/> Add manual fixture</Button><Button onClick={()=>toggleLockRound(selectedRound,true)} disabled={saving} className="rounded-2xl bg-amber-400 text-slate-950 hover:bg-amber-300">Lock selected round</Button><Button onClick={()=>toggleLockRound(selectedRound,false)} disabled={saving} className="rounded-2xl bg-sky-400 text-slate-950 hover:bg-sky-300">Unlock selected round</Button></div><div className="mt-5 rounded-2xl bg-slate-950/60 p-4 text-sm text-slate-300">Auto-lock rule: once the first game in a round reaches kickoff time, every fixture in that round locks for players.</div></CardContent></Card><div className="grid gap-4">{visibleGames.map(game=><AdminGame key={game.id} game={game} database={database} updateGame={updateGame} saving={saving}/>)}</div></section>}
 function AdminGame({game,database,updateGame,saving}){const result=getResult(game); const locked=isGameLocked(game,database.games); function updateScore(field,value){const next={ [field]: value===""?null:Number(value) }; const nextHome=field==="home_score"?next[field]:game.home_score; const nextAway=field==="away_score"?next[field]:game.away_score; if(nextHome!==null&&nextHome!==""&&nextAway!==null&&nextAway!==""){next.status="completed"; next.locked=true} else {next.status="scheduled"} updateGame(game.id,next)} return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="grid gap-4 p-5 xl:grid-cols-[1fr_auto] xl:items-center"><div><div className="mb-3 flex items-center gap-3"><TeamBadge team={game.home} logo={game.home_logo}/><div><h3 className="text-xl font-bold">{game.home} v {game.away}</h3><p className="text-sm text-slate-300">{getPrettyKickoff(game)} · {result?`${result.winner} by ${result.marginPoints} (${result.margin})`:"No result entered"}</p></div><TeamBadge team={game.away} logo={game.away_logo}/></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Input label="Round" value={game.round} onChange={v=>updateGame(game.id,{round:Number(v)||1})}/><Input label="Kickoff text" value={game.kickoff||""} onChange={v=>updateGame(game.id,{kickoff:v})}/><Input label="Home" value={game.home} onChange={v=>updateGame(game.id,{home:v,home_logo:getLogo(v,game.home_logo)})}/><Input label="Away" value={game.away} onChange={v=>updateGame(game.id,{away:v,away_logo:getLogo(v,game.away_logo)})}/></div></div><div className="grid gap-3 sm:grid-cols-[100px_100px_auto] sm:items-end"><Input label="Home score" value={game.home_score??""} onChange={v=>updateScore("home_score",v)}/><Input label="Away score" value={game.away_score??""} onChange={v=>updateScore("away_score",v)}/><button onClick={()=>updateGame(game.id,{locked:!game.locked})} disabled={saving} className={`rounded-xl px-4 py-2 font-semibold disabled:opacity-60 ${locked?"bg-amber-400 text-slate-950":"bg-white/10 text-white hover:bg-white/20"}`}>{locked?"Locked":"Unlocked"}</button></div><div className="xl:col-span-2 rounded-2xl bg-slate-950/50 p-3 text-sm text-slate-300">{result?`Result saved: ${game.home} ${game.home_score} - ${game.away_score} ${game.away}. Leaderboards update automatically.`:`Enter both scores to mark this game complete and calculate points.`}</div></CardContent></Card>}
