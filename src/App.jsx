@@ -94,6 +94,26 @@ function getLogo(team,fallback){return teamLogoMap[team] || ((fallback&&String(f
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
 function getPrettyKickoff(game){ if(!game.kickoff_at) return game.kickoff||"TBC"; try{return new Intl.DateTimeFormat("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Australia/Brisbane"}).format(new Date(game.kickoff_at))}catch{return game.kickoff||"TBC"}}
+function toDateTimeLocal(value){
+  if(!value) return "";
+  try{
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime())) return "";
+    const pad=(n)=>String(n).padStart(2,"0");
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }catch{return ""}
+}
+function fromDateTimeLocal(value){
+  if(!value) return null;
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+function kickoffDisplayFromLocal(value,fallback="TBC"){
+  const iso=fromDateTimeLocal(value);
+  if(!iso) return fallback||"TBC";
+  return getPrettyKickoff({kickoff_at:iso,kickoff:fallback});
+}
 function getResult(game){ if(game.home_score===null||game.home_score===""||game.away_score===null||game.away_score==="") return null; const h=Number(game.home_score), a=Number(game.away_score); if(Number.isNaN(h)||Number.isNaN(a)) return null; if(h===a) return {winner:"Draw",margin:"Draw",marginPoints:0,isDraw:true}; const winner=h>a?game.home:game.away; const marginPoints=Math.abs(h-a); return {winner,margin:marginPoints<=12?"1-12":"13+",marginPoints,isDraw:false}}
 function scoreTip(tip,result){ if(!tip||!result) return 0; if(result.isDraw) return tip.winner==="Draw"?10:0; if(tip.winner!==result.winner) return 0; return tip.margin===result.margin?5:2 }
 function formatTip(tip){ if(!tip) return ""; return tip.winner==="Draw"?"Draw":`${tip.winner} by ${tip.margin}` }
@@ -126,7 +146,11 @@ export default function App(){
   const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
   const currentUser=database.currentUser; const isAdmin=currentUser?.role==="admin";
   const rounds=useMemo(()=>{const list=[...new Set(database.games.map(g=>Number(g.round)).filter(Boolean))].sort((a,b)=>a-b); return list.length?list:[1]},[database.games]);
-  const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>new Date(a.kickoff_at||0)-new Date(b.kickoff_at||0));
+  const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>{
+    const at=a.kickoff_at?new Date(a.kickoff_at).getTime():Number.MAX_SAFE_INTEGER;
+    const bt=b.kickoff_at?new Date(b.kickoff_at).getTime():Number.MAX_SAFE_INTEGER;
+    return at-bt || String(a.kickoff||"").localeCompare(String(b.kickoff||"")) || String(a.home||"").localeCompare(String(b.home||""));
+  });
   const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound);
 
 
@@ -603,6 +627,7 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
   const [draft,setDraft]=React.useState({
     round:game.round,
     kickoff:game.kickoff||"",
+    kickoff_at_local:toDateTimeLocal(game.kickoff_at),
     home:game.home||"",
     away:game.away||"",
     home_score:game.home_score??"",
@@ -613,12 +638,13 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
     setDraft({
       round:game.round,
       kickoff:game.kickoff||"",
+      kickoff_at_local:toDateTimeLocal(game.kickoff_at),
       home:game.home||"",
       away:game.away||"",
       home_score:game.home_score??"",
       away_score:game.away_score??""
     });
-  },[game.id,game.round,game.kickoff,game.home,game.away,game.home_score,game.away_score]);
+  },[game.id,game.round,game.kickoff,game.kickoff_at,game.home,game.away,game.home_score,game.away_score]);
 
   function setField(field,value){
     setDraft({...draft,[field]:value});
@@ -627,9 +653,13 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
   function saveFixture(){
     const homeScore=draft.home_score===""?null:Number(draft.home_score);
     const awayScore=draft.away_score===""?null:Number(draft.away_score);
+    const kickoffAt=fromDateTimeLocal(draft.kickoff_at_local);
+    const kickoffText=kickoffAt?kickoffDisplayFromLocal(draft.kickoff_at_local,draft.kickoff):draft.kickoff;
+
     const update={
       round:Number(draft.round)||1,
-      kickoff:draft.kickoff,
+      kickoff:kickoffText||"TBC",
+      kickoff_at:kickoffAt,
       home:draft.home,
       away:draft.away,
       home_logo:getLogo(draft.home,game.home_logo),
@@ -654,6 +684,8 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
     away_score:draft.away_score
   });
 
+  const shownKickoff=draft.kickoff_at_local?kickoffDisplayFromLocal(draft.kickoff_at_local,draft.kickoff):(draft.kickoff||"TBC");
+
   return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
     <CardContent className="grid gap-4 p-5 xl:grid-cols-[1fr_auto] xl:items-center">
       <div>
@@ -661,13 +693,16 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
           <TeamBadge team={draft.home} logo={game.home_logo}/>
           <div>
             <h3 className="text-xl font-bold">{draft.home} v {draft.away}</h3>
-            <p className="text-sm text-slate-300">{draft.kickoff||"TBC"} · {draftResult?formatResult(draftResult):"No result entered"}</p>
+            <p className="text-sm text-slate-300">{shownKickoff} · {draftResult?formatResult(draftResult):"No result entered"}</p>
           </div>
           <TeamBadge team={draft.away} logo={game.away_logo}/>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Input label="Round" value={draft.round} onChange={v=>setField("round",v)}/>
-          <Input label="Kickoff text" value={draft.kickoff} onChange={v=>setField("kickoff",v)}/>
+          <label className="text-sm font-medium text-slate-300">Kickoff date/time
+            <input type="datetime-local" value={draft.kickoff_at_local} onChange={e=>setField("kickoff_at_local",e.target.value)} className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none"/>
+          </label>
+          <Input label="Kickoff text fallback" value={draft.kickoff} onChange={v=>setField("kickoff",v)} placeholder="Thu 7:50pm"/>
           <Input label="Home" value={draft.home} onChange={v=>setField("home",v)}/>
           <Input label="Away" value={draft.away} onChange={v=>setField("away",v)}/>
         </div>
@@ -680,7 +715,7 @@ function AdminGame({game,database,updateGame,deleteFixture,saving}){
         <button onClick={()=>deleteFixture(game)} disabled={saving} className="rounded-xl bg-red-500 px-4 py-2 font-semibold text-white hover:bg-red-400 disabled:opacity-60"><Trash2 className="mr-2 inline h-4 w-4"/>Delete</button>
       </div>
       <div className="xl:col-span-2 rounded-2xl bg-slate-950/50 p-3 text-sm text-slate-300">
-        {draftResult?`Result ready: ${draft.home} ${draft.home_score} - ${draft.away_score} ${draft.away}. Click Save Fixture to update the leaderboard.`:`Edit fields, then click Save Fixture. Equal scores count as a draw.`}
+        {draftResult?`Result ready: ${draft.home} ${draft.home_score} - ${draft.away_score} ${draft.away}. Click Save Fixture to update the leaderboard.`:`Set kickoff date/time, edit fields, then click Save Fixture. Fixtures will show in kickoff order.`}
       </div>
     </CardContent>
   </Card>
