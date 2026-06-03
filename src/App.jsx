@@ -94,6 +94,25 @@ function getLogo(team,fallback){return teamLogoMap[team] || ((fallback&&String(f
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
 function getPrettyKickoff(game){ if(!game.kickoff_at) return game.kickoff||"TBC"; try{return new Intl.DateTimeFormat("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Australia/Brisbane"}).format(new Date(game.kickoff_at))}catch{return game.kickoff||"TBC"}}
+function getRoundLockoutTime(games,round){
+  const times=(games||[])
+    .filter(g=>Number(g.round)===Number(round)&&g.kickoff_at)
+    .map(g=>new Date(g.kickoff_at).getTime())
+    .filter(t=>!Number.isNaN(t))
+    .sort((a,b)=>a-b);
+  return times[0]||null;
+}
+function formatCountdown(ms){
+  if(ms<=0) return "Locked";
+  const total=Math.floor(ms/1000);
+  const days=Math.floor(total/86400);
+  const hours=Math.floor((total%86400)/3600);
+  const minutes=Math.floor((total%3600)/60);
+  const seconds=total%60;
+  if(days>0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  if(hours>0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
 function toDateTimeLocal(value){
   if(!value) return "";
   try{
@@ -143,7 +162,7 @@ function downloadCsv(filename,headers,rows){
 
 
 export default function App(){
-  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
+  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [now,setNow]=useState(Date.now()); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
   const currentUser=database.currentUser; const isAdmin=currentUser?.role==="admin";
   const rounds=useMemo(()=>{const list=[...new Set(database.games.map(g=>Number(g.round)).filter(Boolean))].sort((a,b)=>a-b); return list.length?list:[1]},[database.games]);
   const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>{
@@ -151,7 +170,7 @@ export default function App(){
     const bt=b.kickoff_at?new Date(b.kickoff_at).getTime():Number.MAX_SAFE_INTEGER;
     return at-bt || String(a.kickoff||"").localeCompare(String(b.kickoff||"")) || String(a.home||"").localeCompare(String(b.home||""));
   });
-  const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound);
+  const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound); const roundLockoutTime=getRoundLockoutTime(database.games,selectedRound); const lockoutCountdown=roundLockoutTime?formatCountdown(roundLockoutTime-now):"TBC";
 
 
   function exportOverallLeaderboard(){
@@ -235,6 +254,7 @@ export default function App(){
   useEffect(()=>{ if(!hasSupabase) savePreviewDatabase(database)},[database]);
   useEffect(()=>{ if(!rounds.includes(Number(selectedRound))&&rounds[0]) setSelectedRound(rounds[0])},[rounds,selectedRound]);
   useEffect(()=>{ if(currentUser) setDraftTips(database.tips.filter(t=>t.player_id===currentUser.id)); else setDraftTips([]) },[currentUser?.id,database.tips]);
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(timer)},[]);
 
   async function handleAuth(e){ e.preventDefault(); setAuthError(""); const email=authForm.email.trim().toLowerCase(), password=authForm.password.trim(), name=authForm.name.trim(); if(!email||!password||(authMode==="register"&&!name)){setAuthError("Please fill in the required fields."); return} if(!hasSupabase){ if(authMode==="register"){const newPlayer={id:makeId("player"),name,email,role:"player"}; setDatabase({...database,currentUser:newPlayer,players:[...database.players,newPlayer]}); return} setDatabase({...database,currentUser:database.players.find(p=>p.email.toLowerCase()===email)||database.players[0]}); return} setSaving(true); if(authMode==="register"){ const {data,error}=await supabase.auth.signUp({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const profile={id:data.user.id,name,email,role:"player"}; const {error:profileError}=await supabase.from("profiles").insert(profile); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false); return} const {data,error}=await supabase.auth.signInWithPassword({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const {data:profile,error:profileError}=await supabase.from("profiles").select("id,name,email,role").eq("id",data.user.id).single(); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false)}
   async function logout(){ if(hasSupabase) await supabase.auth.signOut(); setDatabase({...database,currentUser:null}); setActiveTab("tips") }
@@ -428,7 +448,7 @@ function updateTip(gameId,update){
   if(!currentUser)return <LoginScreen authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} authError={authError} notice={notice} handleAuth={handleAuth} sendPasswordReset={sendPasswordReset} updatePassword={updatePassword} saving={saving}/>;
 
   return <div className="min-h-screen bg-slate-950 text-white"><div className="absolute inset-0 overflow-hidden pointer-events-none"><div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl"/><div className="absolute top-96 -left-24 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl"/></div><main className="relative mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
-    <Header currentUser={currentUser} isAdmin={isAdmin} database={database} completedGames={completedGames} selectedRound={selectedRound} roundLocked={roundLocked} logout={logout}/>
+    <Header currentUser={currentUser} isAdmin={isAdmin} database={database} completedGames={completedGames} selectedRound={selectedRound} roundLocked={roundLocked} lockoutCountdown={lockoutCountdown} roundLockoutTime={roundLockoutTime} logout={logout}/>
     {authError&&<div className="mb-4 rounded-2xl bg-red-500/15 px-4 py-3 text-sm text-red-200">{authError}</div>}{notice&&<div className="mb-4 rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">{notice}</div>}
     <RoundSelector rounds={rounds} selectedRound={selectedRound} setSelectedRound={setSelectedRound} roundLocked={roundLocked}/>
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
@@ -447,7 +467,27 @@ function LoginScreen({authMode,setAuthMode,authForm,setAuthForm,authError,notice
 </CardContent></Card></main></div>}
 function Info({icon,title,text}){return <div className="rounded-2xl bg-white/10 p-4">{React.cloneElement(icon,{className:"mb-3 h-6 w-6 text-emerald-300"})}<div className="font-bold">{title}</div><div className="text-sm text-slate-300">{text}</div></div>}
 function Input({label,value,onChange,placeholder,type="text"}){return <label className="text-sm font-medium text-slate-300">{label}<input type={type} value={value} onChange={e=>onChange(e.target.value)} className="mt-1 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none" placeholder={placeholder}/></label>}
-function Header({currentUser,isAdmin,database,completedGames,selectedRound,roundLocked,logout}){return <motion.header initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between"><div><div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200"><Trophy className="h-4 w-4"/> NRL Tipping Comp</div><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Footy tips, margins and leaderboard</h1><p className="mt-2 max-w-2xl text-slate-300">Logged in as <strong className="text-white">{currentUser.name}</strong> · {isAdmin?"Admin":"Player"} · Round {selectedRound} {roundLocked?"is locked":"is open"}</p></div><div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center"><Card className="border-white/10 bg-white/10 text-white"><CardContent className="p-4"><div className="grid grid-cols-3 gap-4 text-center"><Stat n={database.players.length} t="Players"/><Stat n={database.games.length} t="Games"/><Stat n={completedGames} t="Done"/></div></CardContent></Card><Button onClick={logout} className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200"><LogOut className="mr-2 h-4 w-4"/> Logout</Button></div></motion.header>}
+function Header({currentUser,isAdmin,database,completedGames,selectedRound,roundLocked,lockoutCountdown,roundLockoutTime,logout}){
+  return <motion.header initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between">
+    <div>
+      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200"><Trophy className="h-4 w-4"/> NRL Tipping Comp</div>
+      <div className={`inline-flex flex-col rounded-3xl px-5 py-4 ${roundLocked?"bg-amber-400/15":"bg-emerald-400/15"}`}>
+        <div className="text-sm font-bold uppercase tracking-wide text-slate-300">Round {selectedRound} lockout</div>
+        <div className={`mt-1 text-4xl font-black tracking-tight sm:text-5xl ${roundLocked?"text-amber-200":"text-emerald-300"}`}>{roundLocked?"Locked":lockoutCountdown}</div>
+        <div className="mt-1 text-sm text-slate-300">{roundLocked?"This round is locked.":roundLockoutTime?"until first game starts":"Kickoff time not set yet."}</div>
+      </div>
+      <p className="mt-3 max-w-2xl text-slate-300">Logged in as <strong className="text-white">{currentUser.name}</strong> · {isAdmin?"Admin":"Player"} · Round {selectedRound} {roundLocked?"is locked":"is open"}</p>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+      <Card className="border-white/10 bg-white/10 text-white">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-3 gap-4 text-center"><Stat n={database.players.length} t="Players"/><Stat n={database.games.length} t="Games"/><Stat n={completedGames} t="Done"/></div>
+        </CardContent>
+      </Card>
+      <Button onClick={logout} className="rounded-2xl bg-white text-slate-950 hover:bg-slate-200"><LogOut className="mr-2 h-4 w-4"/> Logout</Button>
+    </div>
+  </motion.header>
+}
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
 function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2">{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
 function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
