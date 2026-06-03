@@ -575,7 +575,6 @@ function Input({label,value,onChange,placeholder,type="text"}){return <label cla
 function Header({currentUser,isAdmin,database,completedGames,selectedRound,roundLocked,lockoutCountdown,roundLockoutTime,logout}){
   return <motion.header initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between">
     <div>
-      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200"><Trophy className="h-4 w-4"/> NRL Tipping Comp</div>
       <div className={`inline-flex flex-col rounded-3xl px-5 py-4 ${roundLocked?"bg-amber-400/15":"bg-emerald-400/15"}`}>
         <div className="text-sm font-bold uppercase tracking-wide text-slate-300">Round {selectedRound} lockout</div>
         <div className={`mt-1 text-4xl font-black tracking-tight sm:text-5xl ${roundLocked?"text-amber-200":"text-emerald-300"}`}>{roundLocked?"Locked":lockoutCountdown}</div>
