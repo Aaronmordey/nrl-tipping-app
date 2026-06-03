@@ -596,7 +596,63 @@ function Header({currentUser,isAdmin,database,completedGames,selectedRound,round
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
 function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2">{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
 function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],["reveal","Tips Reveal",Eye],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
-function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length; const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length; const remaining=Math.max(visibleGames.length-draftCount,0); return <section className="grid gap-5 lg:grid-cols-[280px_1fr]"><Card className="border-white/10 bg-white/10 text-white rounded-3xl"><CardContent className="p-5"><h2 className="mb-3 text-lg font-bold">Your tips</h2><p className="text-sm text-slate-300">Pick every game, then press Save Tips at the bottom.</p><div className="mt-5 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Saved tips</div><div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Tips remaining</div><div className="mt-1 text-3xl font-bold text-amber-300">{remaining}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Current points</div><div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div></div></CardContent></Card><div className="grid gap-4">{saveSuccess&&<Card className="rounded-3xl border border-emerald-400/40 bg-emerald-400/15 text-white"><CardContent className="p-5 text-center"><div className="text-3xl font-black text-emerald-300">✓ Tips saved!</div><p className="mt-2 text-sm text-emerald-100">Your tips for this round have been saved successfully.</p></CardContent></Card>}{visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>) }<Card className={`sticky bottom-3 z-20 rounded-3xl border text-white shadow-2xl backdrop-blur ${saveSuccess?"border-emerald-400/60 bg-emerald-950/95":"border-emerald-400/30 bg-slate-900/95"}`}><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-bold">{saveSuccess?"Saved successfully":"Ready to save?"}</div><div className="text-sm text-slate-300">{saveSuccess?"You can still change tips and save again before lockout.":`${draftCount}/${visibleGames.length} tips selected for this round.`}</div></div><Button onClick={saveAllTips} disabled={saving} className={`rounded-2xl px-6 py-4 text-base font-black text-slate-950 ${saveSuccess?"bg-emerald-300 hover:bg-emerald-200":"bg-emerald-400 hover:bg-emerald-300"}`}>{saving?"Saving...":saveSuccess?"✓ Saved - Save Again":"Save Tips"}</Button></CardContent></Card></div></section>}
+function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){
+  const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length;
+  const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length;
+  const remaining=Math.max(visibleGames.length-draftCount,0);
+
+  const hasUnsavedChanges=visibleGames.some(game=>{
+    const saved=playerTips.find(t=>t.game_id===game.id);
+    const draft=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id);
+    if(!saved&&!draft)return false;
+    if(!saved&&draft)return true;
+    if(saved&&!draft)return true;
+    return saved.winner!==draft.winner||saved.margin!==draft.margin;
+  });
+
+  return <section className="grid gap-5 lg:grid-cols-[280px_1fr]">
+    <Card className="border-white/10 bg-white/10 text-white rounded-3xl">
+      <CardContent className="p-5">
+        <h2 className="mb-3 text-lg font-bold">Your tips</h2>
+        <p className="text-sm text-slate-300">Pick every game. The Save Tips button will appear when you change a tip.</p>
+        <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
+          <div className="text-sm text-slate-400">Saved tips</div>
+          <div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div>
+        </div>
+        <div className="mt-4 rounded-2xl bg-slate-950/60 p-4">
+          <div className="text-sm text-slate-400">Tips remaining</div>
+          <div className="mt-1 text-3xl font-bold text-amber-300">{remaining}</div>
+        </div>
+        <div className="mt-4 rounded-2xl bg-slate-950/60 p-4">
+          <div className="text-sm text-slate-400">Current points</div>
+          <div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div>
+        </div>
+      </CardContent>
+    </Card>
+
+    <div className="grid gap-4">
+      {saveSuccess&&<Card className="rounded-3xl border border-emerald-400/40 bg-emerald-500/15 text-white">
+        <CardContent className="p-4">
+          <p className="font-bold text-emerald-100">✓ Tips saved successfully.</p>
+        </CardContent>
+      </Card>}
+
+      {visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>)}
+
+      {(hasUnsavedChanges||saving)&&<Card className="sticky bottom-3 z-20 rounded-3xl border border-emerald-400/30 bg-slate-900/95 text-white shadow-2xl backdrop-blur">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="font-bold">Unsaved changes</div>
+            <div className="text-sm text-slate-300">{draftCount}/{visibleGames.length} tips selected for this round.</div>
+          </div>
+          <Button onClick={saveAllTips} disabled={saving} className="rounded-2xl bg-emerald-400 px-6 py-4 text-base font-black text-slate-950 hover:bg-emerald-300">
+            {saving?"Saving...":"Save Tips"}
+          </Button>
+        </CardContent>
+      </Card>}
+    </div>
+  </section>
+}
 function GameTip({game,database,currentUser,draftTips,updateTip,saving}){
   const tip=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id);
   const result=getResult(game);
