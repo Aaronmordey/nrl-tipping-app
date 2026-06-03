@@ -293,6 +293,29 @@ export default function App(){
     setSaving(false);
   }
 
+
+  async function updatePlayerName(playerId,name){
+    if(!isAdmin)return;
+    const cleanName=String(name||"").trim();
+    if(!cleanName){setAuthError("Name cannot be blank."); return}
+    const target=database.players.find(p=>p.id===playerId);
+    if(!target)return;
+    setSaving(true); setAuthError(""); setNotice("");
+    if(!hasSupabase){
+      const updatedPlayers=database.players.map(p=>p.id===playerId?{...p,name:cleanName}:p);
+      const updatedCurrent=database.currentUser?.id===playerId?{...database.currentUser,name:cleanName}:database.currentUser;
+      setDatabase({...database,currentUser:updatedCurrent,players:updatedPlayers});
+      setNotice(`Name updated to ${cleanName}.`);
+      setSaving(false);
+      return;
+    }
+    const {error}=await supabase.from("profiles").update({name:cleanName}).eq("id",playerId);
+    if(error)setAuthError(error.message);
+    else setNotice(`Name updated to ${cleanName}.`);
+    await refreshSupabaseData(currentUser);
+    setSaving(false);
+  }
+
   async function updatePlayerRole(playerId,role){
     if(!isAdmin)return;
     const target=database.players.find(p=>p.id===playerId);
@@ -412,7 +435,7 @@ function updateTip(gameId,update){
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
-    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
+    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerName={updatePlayerName} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} saving={saving}/>} 
   </main></div>;
 }
@@ -559,7 +582,7 @@ function TipCheckPanel({database,visibleGames,selectedRound,exportTipCheck}){
 
 
 
-function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerRole,exportPlayers,saving}){
+function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerName,updatePlayerRole,exportPlayers,saving}){
   const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const adminCount=players.filter(p=>p.role==="admin").length;
   const playerCount=players.filter(p=>p.role!=="admin").length;
@@ -570,6 +593,12 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
     const row=(leaderboard||[]).find(r=>r.id===player.id);
     const totalTips=(database.tips||[]).filter(t=>t.player_id===player.id).length;
     return {points:row?.total||0,totalTips};
+  }
+
+  function promptEditName(player){
+    const next=window.prompt("Enter display name", displayName(player));
+    if(next===null)return;
+    updatePlayerName(player.id,next);
   }
 
   return <section className="grid gap-5 lg:grid-cols-[320px_1fr]">
@@ -619,6 +648,7 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
                 <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.totalTips}</div><div className="text-slate-400">Tips</div></div>
               </div>
               <div className="mt-3 grid gap-2">
+                <Button disabled={saving} onClick={()=>promptEditName(player)} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">Edit Name</Button>
                 {player.role==="admin"
                   ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-2xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote to player</Button>
                   : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote to admin</Button>}
@@ -640,9 +670,14 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
                 <td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role||"player"}</span></td>
                 <td className="px-4 py-4 text-slate-300">{stats.totalTips}</td>
                 <td className="px-4 py-4 text-emerald-300 font-bold">{stats.points}</td>
-                <td className="px-4 py-4 text-right">{player.role==="admin"
-                  ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote</Button>
-                  : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote</Button>}</td>
+                <td className="px-4 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button disabled={saving} onClick={()=>promptEditName(player)} className="rounded-xl bg-white/10 text-white hover:bg-white/20">Edit Name</Button>
+                    {player.role==="admin"
+                      ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote</Button>
+                      : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote</Button>}
+                  </div>
+                </td>
               </tr>
             })}</tbody>
           </table>
