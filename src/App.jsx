@@ -333,10 +333,23 @@ export default function App(){
       setSaving(false);
       return;
     }
-    const {error}=await supabase.from("profiles").update({starting_points:value}).eq("id",playerId);
-    if(error)setAuthError(error.message);
-    else setNotice(`Starting points updated for ${target.name||target.email}.`);
-    await refreshSupabaseData(currentUser);
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      const response=await fetch("/api/update-player",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${session?.access_token||""}`
+        },
+        body:JSON.stringify({playerId,starting_points:value})
+      });
+      const result=await response.json();
+      if(!response.ok||!result.ok) throw new Error(result.error||"Could not update starting points.");
+      setNotice(`Starting points updated for ${target.name||target.email}.`);
+      await refreshSupabaseData(currentUser);
+    }catch(error){
+      setAuthError(error.message||"Could not update starting points.");
+    }
     setSaving(false);
   }
 
@@ -355,9 +368,13 @@ export default function App(){
       return;
     }
     try{
+      const {data:{session}}=await supabase.auth.getSession();
       const response=await fetch("/api/delete-player",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${session?.access_token||""}`
+        },
         body:JSON.stringify({playerId})
       });
       const result=await response.json();
@@ -385,10 +402,23 @@ export default function App(){
       setSaving(false);
       return;
     }
-    const {error}=await supabase.from("profiles").update({name:cleanName}).eq("id",playerId);
-    if(error)setAuthError(error.message);
-    else setNotice(`Name updated to ${cleanName}.`);
-    await refreshSupabaseData(currentUser);
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      const response=await fetch("/api/update-player",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${session?.access_token||""}`
+        },
+        body:JSON.stringify({playerId,name:cleanName})
+      });
+      const result=await response.json();
+      if(!response.ok||!result.ok) throw new Error(result.error||"Could not update name.");
+      setNotice(`Name updated to ${cleanName}.`);
+      await refreshSupabaseData(currentUser);
+    }catch(error){
+      setAuthError(error.message||"Could not update name.");
+    }
     setSaving(false);
   }
 
