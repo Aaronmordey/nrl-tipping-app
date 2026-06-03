@@ -12,11 +12,6 @@ export default async function handler(req, res) {
       return res.status(405).json({ ok: false, error: "Use POST." });
     }
 
-    const { playerId } = req.body || {};
-    if (!playerId) {
-      return res.status(400).json({ ok: false, error: "playerId is required." });
-    }
-
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl) throw new Error("Missing VITE_SUPABASE_URL");
@@ -36,10 +31,6 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, error: "Invalid login session." });
     }
 
-    if (userData.user.id === playerId) {
-      return res.status(400).json({ ok: false, error: "You cannot delete your own account while logged in." });
-    }
-
     const { data: adminProfile, error: adminError } = await supabaseAdmin
       .from("profiles")
       .select("role")
@@ -50,13 +41,36 @@ export default async function handler(req, res) {
       return res.status(403).json({ ok: false, error: "Admin access required." });
     }
 
-    await supabaseAdmin.from("tips").delete().eq("player_id", playerId);
-    await supabaseAdmin.from("profiles").delete().eq("id", playerId);
-
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(playerId);
-    if (authError && !String(authError.message || "").toLowerCase().includes("not found")) {
-      throw authError;
+    const { playerId, name, starting_points } = req.body || {};
+    if (!playerId) {
+      return res.status(400).json({ ok: false, error: "playerId is required." });
     }
+
+    const update = {};
+    if (typeof name === "string") {
+      const cleanName = name.trim();
+      if (!cleanName) return res.status(400).json({ ok: false, error: "Name cannot be blank." });
+      update.name = cleanName;
+    }
+
+    if (starting_points !== undefined) {
+      const points = Number(starting_points);
+      if (Number.isNaN(points) || points < 0) {
+        return res.status(400).json({ ok: false, error: "Starting points must be 0 or more." });
+      }
+      update.starting_points = points;
+    }
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ ok: false, error: "No update supplied." });
+    }
+
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update(update)
+      .eq("id", playerId);
+
+    if (error) throw error;
 
     return res.status(200).json({ ok: true });
   } catch (error) {
