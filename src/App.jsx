@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock, ClipboardList, Trash2, UserCog } from "lucide-react";
+import { Trophy, Users, Lock, CalendarDays, Settings, CheckCircle2, LogOut, UserPlus, Database, Shield, Download, RefreshCw, Medal, Clock, ClipboardList, Trash2, UserCog, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 
 function Button({ className = "", children, ...props }) {
@@ -559,6 +559,7 @@ function updateTip(gameId,update){
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
+    {activeTab==="reveal"&&<RevealTipsPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} roundLocked={roundLocked}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
     {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerName={updatePlayerName} updatePlayerStartingPoints={updatePlayerStartingPoints} deletePlayer={deletePlayer} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} backupAllData={backupAllData} saving={saving}/>} 
@@ -594,7 +595,7 @@ function Header({currentUser,isAdmin,database,completedGames,selectedRound,round
 }
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
 function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2">{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
-function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
+function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],["reveal","Tips Reveal",Eye],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
 function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length; const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length; const remaining=Math.max(visibleGames.length-draftCount,0); return <section className="grid gap-5 lg:grid-cols-[280px_1fr]"><Card className="border-white/10 bg-white/10 text-white rounded-3xl"><CardContent className="p-5"><h2 className="mb-3 text-lg font-bold">Your tips</h2><p className="text-sm text-slate-300">Pick every game, then press Save Tips at the bottom.</p><div className="mt-5 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Saved tips</div><div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Tips remaining</div><div className="mt-1 text-3xl font-bold text-amber-300">{remaining}</div></div><div className="mt-4 rounded-2xl bg-slate-950/60 p-4"><div className="text-sm text-slate-400">Current points</div><div className="mt-1 text-3xl font-bold text-emerald-300">{leaderboard.find(p=>p.id===currentUser.id)?.total||0}</div></div></CardContent></Card><div className="grid gap-4">{saveSuccess&&<Card className="rounded-3xl border border-emerald-400/40 bg-emerald-400/15 text-white"><CardContent className="p-5 text-center"><div className="text-3xl font-black text-emerald-300">✓ Tips saved!</div><p className="mt-2 text-sm text-emerald-100">Your tips for this round have been saved successfully.</p></CardContent></Card>}{visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>) }<Card className={`sticky bottom-3 z-20 rounded-3xl border text-white shadow-2xl backdrop-blur ${saveSuccess?"border-emerald-400/60 bg-emerald-950/95":"border-emerald-400/30 bg-slate-900/95"}`}><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-bold">{saveSuccess?"Saved successfully":"Ready to save?"}</div><div className="text-sm text-slate-300">{saveSuccess?"You can still change tips and save again before lockout.":`${draftCount}/${visibleGames.length} tips selected for this round.`}</div></div><Button onClick={saveAllTips} disabled={saving} className={`rounded-2xl px-6 py-4 text-base font-black text-slate-950 ${saveSuccess?"bg-emerald-300 hover:bg-emerald-200":"bg-emerald-400 hover:bg-emerald-300"}`}>{saving?"Saving...":saveSuccess?"✓ Saved - Save Again":"Save Tips"}</Button></CardContent></Card></div></section>}
 function GameTip({game,database,currentUser,draftTips,updateTip,saving}){
   const tip=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id);
@@ -636,6 +637,91 @@ function LeaderboardPanel({mode,selectedRound,leaderboard,weeklyLeaderboard,roun
 function Table({rows}){return <><div className="grid gap-3 md:hidden">{rows.map((p,i)=><div key={p.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-sm text-slate-400">#{i+1}</div><div className="text-lg font-bold">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</div></div><div className="text-3xl font-black text-emerald-300">{p.total}</div></div><div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm"><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.submitted}</div><div className="text-slate-400">Tips</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctWinners}</div><div className="text-slate-400">Winners</div></div><div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{p.correctMargins}</div><div className="text-slate-400">Margins</div></div></div></div>)}</div><div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block"><table className="w-full table-fixed border-collapse text-left text-sm"><thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-3">Rank</th><th className="px-4 py-3">Player</th><th className="px-4 py-3">Tips</th><th className="px-4 py-3">Winners</th><th className="px-4 py-3">Margins</th><th className="px-4 py-3 text-right">Points</th></tr></thead><tbody>{rows.map((p,i)=><tr key={p.id} className="border-t border-white/10"><td className="px-4 py-4 font-bold">#{i+1}</td><td className="px-4 py-4">{p.name} {p.role==="admin"&&<span className="ml-2 rounded-full bg-emerald-400/20 px-2 py-1 text-xs text-emerald-200">Admin</span>}</td><td className="px-4 py-4 text-slate-300">{p.submitted}</td><td className="px-4 py-4 text-slate-300">{p.correctWinners}</td><td className="px-4 py-4 text-slate-300">{p.correctMargins}</td><td className="px-4 py-4 text-right text-xl font-bold text-emerald-300">{p.total}</td></tr>)}</tbody></table></div></>}
 
 function HistoryPanel({roundSummaries,setSelectedRound,setActiveTab}){return <div className="grid gap-4">{roundSummaries.map(summary=><Card key={summary.round} className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">Round {summary.round}</h2><p className="text-sm text-slate-300">{summary.completed}/{summary.games} games completed</p>{summary.winner&&<p className="mt-2 text-emerald-200">Leader: <strong>{summary.winner.name}</strong> · {summary.winner.total} points</p>}</div><div className="flex gap-2"><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("weekly")}} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">View weekly ladder</Button><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("tips")}} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">View games</Button></div></div><div className="mt-4 grid gap-2 sm:grid-cols-3">{summary.rows.slice(0,3).map((p,i)=><div key={p.id} className="rounded-2xl bg-slate-950/50 p-3"><div className="text-sm text-slate-400">#{i+1}</div><div className="font-bold">{p.name}</div><div className="text-emerald-300">{p.total} pts</div></div>)}</div></CardContent></Card>)}</div>}
+
+
+function RevealTipsPanel({database,visibleGames,selectedRound,roundLocked}){
+  const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
+  const games=[...(visibleGames||[])];
+
+  function playerName(player){
+    return player.name || player.email || "Unnamed player";
+  }
+
+  function tipFor(player,game){
+    return (database.tips||[]).find(t=>t.player_id===player.id&&t.game_id===game.id);
+  }
+
+  if(!roundLocked){
+    return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-6">
+        <h2 className="text-2xl font-bold">Tips Reveal</h2>
+        <p className="mt-2 text-slate-300">Everyone’s tips will be visible here once Round {selectedRound} locks.</p>
+        <div className="mt-5 rounded-2xl bg-amber-400/15 p-4 text-amber-100">
+          Tips are hidden until the first game of the round starts, so nobody can copy other players before lockout.
+        </div>
+      </CardContent>
+    </Card>
+  }
+
+  if(!games.length){
+    return <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-6">
+        <h2 className="text-2xl font-bold">Tips Reveal</h2>
+        <p className="mt-2 text-slate-300">No fixtures found for Round {selectedRound}.</p>
+      </CardContent>
+    </Card>
+  }
+
+  return <section className="grid gap-5">
+    <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
+      <CardContent className="p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Round {selectedRound} Tips Reveal</h2>
+            <p className="mt-1 text-slate-300">The round is locked, so everyone can now see each other’s tips.</p>
+          </div>
+          <div className="rounded-2xl bg-emerald-400/15 px-4 py-2 text-sm font-bold text-emerald-200">Visible after lockout</div>
+        </div>
+      </CardContent>
+    </Card>
+
+    {games.map(game=>{
+      const result=getResult(game);
+      return <Card key={game.id} className="rounded-3xl border border-white/10 bg-white/10 text-white">
+        <CardContent className="p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <TeamBadge team={game.home} logo={game.home_logo}/>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 font-black text-slate-300">v</div>
+              <TeamBadge team={game.away} logo={game.away_logo}/>
+              <div>
+                <div className="font-bold">{game.home} v {game.away}</div>
+                <div className="text-sm text-slate-300">{getPrettyKickoff(game)}</div>
+              </div>
+            </div>
+            {result&&<div className="rounded-2xl bg-emerald-400/15 px-4 py-2 text-sm font-bold text-emerald-200">Result: {formatResult(result)}</div>}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {players.map(player=>{
+              const tip=tipFor(player,game);
+              const points=scoreTip(tip,result);
+              return <div key={`${player.id}-${game.id}`} className="rounded-2xl bg-slate-950/50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-bold">{playerName(player)}</div>
+                    <div className="text-sm text-slate-300">{tip?formatTip(tip):"No tip submitted"}</div>
+                  </div>
+                  {result&&<div className="shrink-0 rounded-xl bg-white/10 px-3 py-1 text-sm font-bold text-emerald-300">{points}</div>}
+                </div>
+              </div>
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    })}
+  </section>
+}
 
 function TipCheckPanel({database,visibleGames,selectedRound,exportTipCheck}){
   const roundGames = visibleGames;
