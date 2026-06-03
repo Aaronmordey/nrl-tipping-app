@@ -54,6 +54,25 @@ function getLogo(team,fallback){return (fallback&&String(fallback).startsWith("h
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
 function getPrettyKickoff(game){ if(!game.kickoff_at) return game.kickoff||"TBC"; try{return new Intl.DateTimeFormat("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Australia/Brisbane"}).format(new Date(game.kickoff_at))}catch{return game.kickoff||"TBC"}}
+function getRoundLockoutTime(games,round){
+  const times=(games||[])
+    .filter(g=>Number(g.round)===Number(round)&&g.kickoff_at)
+    .map(g=>new Date(g.kickoff_at).getTime())
+    .filter(t=>!Number.isNaN(t))
+    .sort((a,b)=>a-b);
+  return times[0]||null;
+}
+function formatCountdown(ms){
+  if(ms<=0) return "Locked";
+  const total=Math.floor(ms/1000);
+  const days=Math.floor(total/86400);
+  const hours=Math.floor((total%86400)/3600);
+  const minutes=Math.floor((total%3600)/60);
+  const seconds=total%60;
+  if(days>0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  if(hours>0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
 function getResult(game){ if(game.home_score===null||game.home_score===""||game.away_score===null||game.away_score==="") return null; const h=Number(game.home_score), a=Number(game.away_score); if(Number.isNaN(h)||Number.isNaN(a)||h===a) return null; const winner=h>a?game.home:game.away; const marginPoints=Math.abs(h-a); return {winner,margin:marginPoints<=12?"1-12":"13+",marginPoints}}
 function scoreTip(tip,result){ if(!tip||!result) return 0; if(tip.winner!==result.winner) return 0; return tip.margin===result.margin?5:2 }
 function roundLockStarted(games,round){ const times=games.filter(g=>Number(g.round)===Number(round)).map(g=>g.kickoff_at?new Date(g.kickoff_at).getTime():null).filter(Boolean); return times.length?Date.now()>=Math.min(...times):false }
@@ -81,11 +100,11 @@ function downloadCsv(filename,headers,rows){
 
 
 export default function App(){
-  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [featureImages,setFeatureImages]=useState({14:"/weekly/round-14.png"}); const [featureRound,setFeatureRound]=useState("14"); const [featureImageUrl,setFeatureImageUrl]=useState("/weekly/round-14.png"); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
+  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [now,setNow]=useState(Date.now()); const [featureImages,setFeatureImages]=useState({14:"/weekly/round-14.png"}); const [featureRound,setFeatureRound]=useState("14"); const [featureImageUrl,setFeatureImageUrl]=useState("/weekly/round-14.png"); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
   const currentUser=database.currentUser; const isAdmin=currentUser?.role==="admin";
   const rounds=useMemo(()=>{const list=[...new Set(database.games.map(g=>Number(g.round)).filter(Boolean))].sort((a,b)=>a-b); return list.length?list:[1]},[database.games]);
   const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>new Date(a.kickoff_at||0)-new Date(b.kickoff_at||0));
-  const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound);
+  const playerTips=database.tips.filter(t=>t.player_id===currentUser?.id); const leaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips),[database]); const weeklyLeaderboard=useMemo(()=>scoreRows(database.players,database.games,database.tips,selectedRound),[database,selectedRound]); const roundSummaries=useMemo(()=>rounds.map(round=>{const rows=scoreRows(database.players,database.games,database.tips,round); const games=database.games.filter(g=>Number(g.round)===Number(round)); const completed=games.filter(g=>getResult(g)).length; return {round, winner:rows[0], games:games.length, completed, rows};}),[rounds,database]); const roundWinner=weeklyLeaderboard[0]; const completedGames=database.games.filter(g=>getResult(g)).length; const roundLocked=roundLockStarted(database.games,selectedRound); const roundLockoutTime=getRoundLockoutTime(database.games,selectedRound); const lockoutCountdown=roundLockoutTime?formatCountdown(roundLockoutTime-now):"TBC"; const selectedFeatureImage=featureImages[String(selectedRound)]||featureImages[selectedRound]||"";
 
 
   function exportOverallLeaderboard(){
@@ -150,16 +169,21 @@ export default function App(){
 
 
   async function loadFeatureImages(){
-    if(!hasSupabase)return {14:"/weekly/round-14.png"};
+    const fallback={14:"/weekly/round-14.png"};
+    if(!hasSupabase)return fallback;
     try{
-      const {data,error}=await supabase.from("app_settings").select("value").eq("key","round_feature_images").single();
-      if(error||!data)return {14:"/weekly/round-14.png"};
-      const value=data.value||{};
-      const next={14:"/weekly/round-14.png",...value};
+      const {data,error}=await supabase.from("app_settings").select("value").eq("key","round_feature_images").limit(1);
+      if(error||!data||!data.length){
+        setFeatureImages(fallback);
+        return fallback;
+      }
+      const value=data[0]?.value||{};
+      const next={...fallback,...value};
       setFeatureImages(next);
       return next;
     }catch{
-      return {14:"/weekly/round-14.png"};
+      setFeatureImages(fallback);
+      return fallback;
     }
   }
 
@@ -202,11 +226,12 @@ export default function App(){
       return;
     }
     const {data}=await supabase.auth.getSession(); const user=data?.session?.user; if(!user){setLoading(false);return}
-    const {data:profile}=await supabase.from("profiles").select("id,name,email,role").eq("id",user.id).single(); if(profile) await refreshSupabaseData(profile); setLoading(false)
+    const {data:profile}=await supabase.from("profiles").select("id,name,email,role,starting_points").eq("id",user.id).single(); if(profile) await refreshSupabaseData(profile); setLoading(false)
   } boot()},[]);
   useEffect(()=>{ if(!hasSupabase) savePreviewDatabase(database)},[database]);
   useEffect(()=>{ if(!rounds.includes(Number(selectedRound))&&rounds[0]) setSelectedRound(rounds[0])},[rounds,selectedRound]);
   useEffect(()=>{ if(currentUser) setDraftTips(database.tips.filter(t=>t.player_id===currentUser.id)); else setDraftTips([]) },[currentUser?.id,database.tips]);
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(timer)},[]);
 
   async function handleAuth(e){ e.preventDefault(); setAuthError(""); const email=authForm.email.trim().toLowerCase(), password=authForm.password.trim(), name=authForm.name.trim(); if(!email||!password||(authMode==="register"&&!name)){setAuthError("Please fill in the required fields."); return} if(!hasSupabase){ if(authMode==="register"){const newPlayer={id:makeId("player"),name,email,role:"player"}; setDatabase({...database,currentUser:newPlayer,players:[...database.players,newPlayer]}); return} setDatabase({...database,currentUser:database.players.find(p=>p.email.toLowerCase()===email)||database.players[0]}); return} setSaving(true); if(authMode==="register"){ const {data,error}=await supabase.auth.signUp({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const profile={id:data.user.id,name,email,role:"player"}; const {error:profileError}=await supabase.from("profiles").insert(profile); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false); return} const {data,error}=await supabase.auth.signInWithPassword({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const {data:profile,error:profileError}=await supabase.from("profiles").select("id,name,email,role").eq("id",data.user.id).single(); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false)}
   async function logout(){ if(hasSupabase) await supabase.auth.signOut(); setDatabase({...database,currentUser:null}); setActiveTab("tips") }
