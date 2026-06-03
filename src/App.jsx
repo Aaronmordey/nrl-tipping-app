@@ -78,7 +78,7 @@ const teamLogoMap = {
 
 const previewDatabase = {
   currentUser: null,
-  players: [{id:"admin",name:"Aaron",email:"admin@nrltips.com",role:"admin"},{id:"p2",name:"Ivy",email:"ivy@test.com",role:"player"},{id:"p3",name:"Mick",email:"mick@test.com",role:"player"}],
+  players: [{id:"admin",name:"Aaron",email:"admin@nrltips.com",role:"admin",starting_points:0},{id:"p2",name:"Ivy",email:"ivy@test.com",role:"player",starting_points:0},{id:"p3",name:"Mick",email:"mick@test.com",role:"player",starting_points:0}],
   games: [
     {id:"g1",round:1,season:"2026",kickoff:"Thu 7:50pm",kickoff_at:new Date(Date.now()+86400000).toISOString(),home:"Broncos",away:"Storm",locked:false,home_score:null,away_score:null,status:"scheduled"},
     {id:"g2",round:1,season:"2026",kickoff:"Fri 6:00pm",kickoff_at:new Date(Date.now()+172800000).toISOString(),home:"Warriors",away:"Dragons",locked:false,home_score:null,away_score:null,status:"scheduled"},
@@ -140,7 +140,7 @@ function formatResult(result){ if(!result) return ""; return result.isDraw?"Draw
 function roundLockStarted(games,round){ const times=games.filter(g=>Number(g.round)===Number(round)).map(g=>g.kickoff_at?new Date(g.kickoff_at).getTime():null).filter(Boolean); return times.length?Date.now()>=Math.min(...times):false }
 function isGameLocked(game,games){ return game.locked || roundLockStarted(games,game.round) }
 function normalizeSportsEvent(event,season){ const home=event.strHomeTeam||event.strHome||"Home Team"; const away=event.strAwayTeam||event.strAway||"Away Team"; const hs=event.intHomeScore===null||event.intHomeScore===undefined||event.intHomeScore===""?null:Number(event.intHomeScore); const as=event.intAwayScore===null||event.intAwayScore===undefined||event.intAwayScore===""?null:Number(event.intAwayScore); const kickoff_at=parseSportsDate(event); return {external_id:String(event.idEvent),season:String(season||event.strSeason||new Date().getFullYear()),round:Number(event.intRound||event.intRoundNumber||1),kickoff:kickoff_at?getPrettyKickoff({kickoff_at}):(event.dateEvent||"TBC"),kickoff_at,home,away,venue:event.strVenue||null,home_logo:getLogo(home,event.strHomeTeamBadge),away_logo:getLogo(away,event.strAwayTeamBadge),locked:false,home_score:hs,away_score:as,status:hs!==null&&as!==null?"completed":"scheduled"}}
-function scoreRows(players,games,tips,round=null){ const scoped=round?games.filter(g=>Number(g.round)===Number(round)):games; return players.map(p=>{ const total=scoped.reduce((sum,g)=>sum+scoreTip(tips.find(t=>t.player_id===p.id&&t.game_id===g.id),getResult(g)),0); const submitted=scoped.filter(g=>tips.find(t=>t.player_id===p.id&&t.game_id===g.id)).length; const correctWinners=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner}).length; const correctMargins=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner&&tip.margin===r.margin}).length; return {...p,total,submitted,correctWinners,correctMargins}}).sort((a,b)=>b.total-a.total||b.correctWinners-a.correctWinners||b.submitted-a.submitted||String(a.name||"").localeCompare(String(b.name||""))) }
+function scoreRows(players,games,tips,round=null){ const scoped=round?games.filter(g=>Number(g.round)===Number(round)):games; return players.map(p=>{ const appPoints=scoped.reduce((sum,g)=>sum+scoreTip(tips.find(t=>t.player_id===p.id&&t.game_id===g.id),getResult(g)),0); const startingPoints=round?0:Number(p.starting_points||0); const total=startingPoints+appPoints; const submitted=scoped.filter(g=>tips.find(t=>t.player_id===p.id&&t.game_id===g.id)).length; const correctWinners=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner}).length; const correctMargins=scoped.filter(g=>{const tip=tips.find(t=>t.player_id===p.id&&t.game_id===g.id), r=getResult(g); return tip&&r&&tip.winner===r.winner&&tip.margin===r.margin}).length; return {...p,total,appPoints,startingPoints,submitted,correctWinners,correctMargins}}).sort((a,b)=>b.total-a.total||b.correctWinners-a.correctWinners||b.submitted-a.submitted||String(a.name||"").localeCompare(String(b.name||""))) }
 
 function csvEscape(value){
   const v=value===null||value===undefined?"":String(value);
@@ -179,12 +179,14 @@ export default function App(){
       Name:p.name,
       Email:p.email,
       Role:p.role,
+      StartingPoints:p.startingPoints||0,
+      AppPoints:p.appPoints||0,
       Tips:p.submitted,
       Winners:p.correctWinners,
       Margins:p.correctMargins,
       Points:p.total
     }));
-    downloadCsv("overall-leaderboard.csv",["Rank","Name","Email","Role","Tips","Winners","Margins","Points"],rows);
+    downloadCsv("overall-leaderboard.csv",["Rank","Name","Email","Role","StartingPoints","AppPoints","Tips","Winners","Margins","Points"],rows);
   }
 
   function exportWeeklyLeaderboard(){
@@ -209,11 +211,12 @@ export default function App(){
         Name:p.name,
         Email:p.email,
         Role:p.role,
+        StartingPoints:Number(p.starting_points||0),
         TotalTips:database.tips.filter(t=>t.player_id===p.id).length,
         Points:row.total||0
       };
     });
-    downloadCsv("players.csv",["Name","Email","Role","TotalTips","Points"],rows);
+    downloadCsv("players.csv",["Name","Email","Role","StartingPoints","TotalTips","Points"],rows);
   }
 
   function exportTipCheck(){
@@ -233,7 +236,7 @@ export default function App(){
     downloadCsv(`round-${selectedRound}-tip-check.csv`,["Round","Name","Email","Role","Submitted","Missing","Status"],rows);
   }
 
-  async function refreshSupabaseData(userProfile=currentUser){ if(!supabase||!userProfile)return; setLoading(true); const [{data:profiles,error:pe},{data:games,error:ge},{data:tips,error:te}]=await Promise.all([supabase.from("profiles").select("id,name,email,role").order("name"),supabase.from("games").select("*").order("round").order("kickoff_at",{nullsFirst:false}),supabase.from("tips").select("id,player_id,game_id,winner,margin,updated_at")]); if(pe||ge||te){setAuthError(pe?.message||ge?.message||te?.message||"Could not load database."); setLoading(false); return} const fresh=profiles.find(p=>p.id===userProfile.id)||userProfile; setDatabase({currentUser:fresh,players:profiles||[],games:games||[],tips:tips||[]}); setLoading(false) }
+  async function refreshSupabaseData(userProfile=currentUser){ if(!supabase||!userProfile)return; setLoading(true); const [{data:profiles,error:pe},{data:games,error:ge},{data:tips,error:te}]=await Promise.all([supabase.from("profiles").select("id,name,email,role,starting_points").order("name"),supabase.from("games").select("*").order("round").order("kickoff_at",{nullsFirst:false}),supabase.from("tips").select("id,player_id,game_id,winner,margin,updated_at")]); if(pe||ge||te){setAuthError(pe?.message||ge?.message||te?.message||"Could not load database."); setLoading(false); return} const fresh=profiles.find(p=>p.id===userProfile.id)||userProfile; setDatabase({currentUser:fresh,players:profiles||[],games:games||[],tips:tips||[]}); setLoading(false) }
   useEffect(()=>{async function boot(){
     if(!hasSupabase){const local=loadPreviewDatabase(); setDatabase(local); setSelectedRound(Number(local.games?.[0]?.round||1)); setLoading(false); return}
     const hash=new URLSearchParams(window.location.hash.replace(/^#/,""));
@@ -249,14 +252,14 @@ export default function App(){
       return;
     }
     const {data}=await supabase.auth.getSession(); const user=data?.session?.user; if(!user){setLoading(false);return}
-    const {data:profile}=await supabase.from("profiles").select("id,name,email,role").eq("id",user.id).single(); if(profile) await refreshSupabaseData(profile); setLoading(false)
+    const {data:profile}=await supabase.from("profiles").select("id,name,email,role,starting_points").eq("id",user.id).single(); if(profile) await refreshSupabaseData(profile); setLoading(false)
   } boot()},[]);
   useEffect(()=>{ if(!hasSupabase) savePreviewDatabase(database)},[database]);
   useEffect(()=>{ if(!rounds.includes(Number(selectedRound))&&rounds[0]) setSelectedRound(rounds[0])},[rounds,selectedRound]);
   useEffect(()=>{ if(currentUser) setDraftTips(database.tips.filter(t=>t.player_id===currentUser.id)); else setDraftTips([]) },[currentUser?.id,database.tips]);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(timer)},[]);
 
-  async function handleAuth(e){ e.preventDefault(); setAuthError(""); const email=authForm.email.trim().toLowerCase(), password=authForm.password.trim(), name=authForm.name.trim(); if(!email||!password||(authMode==="register"&&!name)){setAuthError("Please fill in the required fields."); return} if(!hasSupabase){ if(authMode==="register"){const newPlayer={id:makeId("player"),name,email,role:"player"}; setDatabase({...database,currentUser:newPlayer,players:[...database.players,newPlayer]}); return} setDatabase({...database,currentUser:database.players.find(p=>p.email.toLowerCase()===email)||database.players[0]}); return} setSaving(true); if(authMode==="register"){ const {data,error}=await supabase.auth.signUp({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const profile={id:data.user.id,name,email,role:"player"}; const {error:profileError}=await supabase.from("profiles").insert(profile); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false); return} const {data,error}=await supabase.auth.signInWithPassword({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const {data:profile,error:profileError}=await supabase.from("profiles").select("id,name,email,role").eq("id",data.user.id).single(); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false)}
+  async function handleAuth(e){ e.preventDefault(); setAuthError(""); const email=authForm.email.trim().toLowerCase(), password=authForm.password.trim(), name=authForm.name.trim(); if(!email||!password||(authMode==="register"&&!name)){setAuthError("Please fill in the required fields."); return} if(!hasSupabase){ if(authMode==="register"){const newPlayer={id:makeId("player"),name,email,role:"player"}; setDatabase({...database,currentUser:newPlayer,players:[...database.players,newPlayer]}); return} setDatabase({...database,currentUser:database.players.find(p=>p.email.toLowerCase()===email)||database.players[0]}); return} setSaving(true); if(authMode==="register"){ const {data,error}=await supabase.auth.signUp({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const profile={id:data.user.id,name,email,role:"player",starting_points:0}; const {error:profileError}=await supabase.from("profiles").insert(profile); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false); return} const {data,error}=await supabase.auth.signInWithPassword({email,password}); if(error){setSaving(false);return setAuthError(error.message)} const {data:profile,error:profileError}=await supabase.from("profiles").select("id,name,email,role,starting_points").eq("id",data.user.id).single(); if(profileError){setSaving(false);return setAuthError(profileError.message)} await refreshSupabaseData(profile); setSaving(false)}
   async function logout(){ if(hasSupabase) await supabase.auth.signOut(); setDatabase({...database,currentUser:null}); setActiveTab("tips") }
 
   async function sendPasswordReset(){
@@ -313,6 +316,59 @@ export default function App(){
     setSaving(false);
   }
 
+
+
+  async function updatePlayerStartingPoints(playerId,points){
+    if(!isAdmin)return;
+    const value=Number(points);
+    if(Number.isNaN(value)||value<0){setAuthError("Starting points must be 0 or more."); return}
+    const target=database.players.find(p=>p.id===playerId);
+    if(!target)return;
+    setSaving(true); setAuthError(""); setNotice("");
+    if(!hasSupabase){
+      const updatedPlayers=database.players.map(p=>p.id===playerId?{...p,starting_points:value}:p);
+      const updatedCurrent=database.currentUser?.id===playerId?{...database.currentUser,starting_points:value}:database.currentUser;
+      setDatabase({...database,currentUser:updatedCurrent,players:updatedPlayers});
+      setNotice(`Starting points updated for ${target.name||target.email}.`);
+      setSaving(false);
+      return;
+    }
+    const {error}=await supabase.from("profiles").update({starting_points:value}).eq("id",playerId);
+    if(error)setAuthError(error.message);
+    else setNotice(`Starting points updated for ${target.name||target.email}.`);
+    await refreshSupabaseData(currentUser);
+    setSaving(false);
+  }
+
+  async function deletePlayer(playerId){
+    if(!isAdmin)return;
+    const target=database.players.find(p=>p.id===playerId);
+    if(!target)return;
+    if(target.id===currentUser.id){setAuthError("You cannot delete your own admin account while logged in."); return}
+    const ok=window.confirm(`Delete ${target.name||target.email}? This removes their account, profile and tips. This cannot be undone.`);
+    if(!ok)return;
+    setSaving(true); setAuthError(""); setNotice("");
+    if(!hasSupabase){
+      setDatabase({...database,players:database.players.filter(p=>p.id!==playerId),tips:database.tips.filter(t=>t.player_id!==playerId)});
+      setNotice(`${target.name||target.email} deleted.`);
+      setSaving(false);
+      return;
+    }
+    try{
+      const response=await fetch("/api/delete-player",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({playerId})
+      });
+      const result=await response.json();
+      if(!response.ok||!result.ok) throw new Error(result.error||"Could not delete player.");
+      setNotice(`${target.name||target.email} deleted.`);
+      await refreshSupabaseData(currentUser);
+    }catch(error){
+      setAuthError(error.message||"Could not delete player.");
+    }
+    setSaving(false);
+  }
 
   async function updatePlayerName(playerId,name){
     if(!isAdmin)return;
@@ -455,7 +511,7 @@ function updateTip(gameId,update){
     {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
-    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerName={updatePlayerName} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
+    {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerName={updatePlayerName} updatePlayerStartingPoints={updatePlayerStartingPoints} deletePlayer={deletePlayer} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} saving={saving}/>} 
   </main></div>;
 }
@@ -622,7 +678,8 @@ function TipCheckPanel({database,visibleGames,selectedRound,exportTipCheck}){
 
 
 
-function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerName,updatePlayerRole,exportPlayers,saving}){
+
+function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,invitePlayer,updatePlayerName,updatePlayerStartingPoints,deletePlayer,updatePlayerRole,exportPlayers,saving}){
   const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const adminCount=players.filter(p=>p.role==="admin").length;
   const playerCount=players.filter(p=>p.role!=="admin").length;
@@ -634,18 +691,22 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
     const totalTips=(database.tips||[]).filter(t=>t.player_id===player.id).length;
     return {points:row?.total||0,totalTips};
   }
-
   function promptEditName(player){
     const next=window.prompt("Enter display name", displayName(player));
     if(next===null)return;
     updatePlayerName(player.id,next);
   }
+  function promptEditPoints(player){
+    const next=window.prompt("Enter current competition points", String(player.starting_points||0));
+    if(next===null)return;
+    updatePlayerStartingPoints(player.id,next);
+  }
 
-  return <section className="grid gap-5 lg:grid-cols-[320px_1fr]">
+  return <section className="grid gap-5 xl:grid-cols-[300px_1fr]">
     <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
       <CardContent className="p-4">
         <h2 className="text-xl font-bold">Player management</h2>
-        <p className="mt-2 text-sm text-slate-300">View users and manage admin access. Player history is kept safe.</p>
+        <p className="mt-2 text-sm text-slate-300">View users, carry-over points and admin access. Player history is kept safe.</p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-slate-950/60 p-4 text-center">
             <div className="text-3xl font-black text-emerald-300">{playerCount}</div>
@@ -657,7 +718,7 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
           </div>
         </div>
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4 text-sm text-slate-300">
-          Tip: avoid deleting users because it can affect old tips and leaderboard history. Promote/demote roles here instead.
+          Starting points are the current ladder points from before this app took over.
         </div>
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
           <div className="mb-2 text-sm font-bold text-slate-200">Invite a player</div>
@@ -670,7 +731,10 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
 
     <Card className="rounded-3xl border border-white/10 bg-white/10 text-white">
       <CardContent className="p-5">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-2xl font-bold">Registered users</h2><Button onClick={exportPlayers} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export CSV</Button></div>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-2xl font-bold">Registered users</h2>
+          <Button onClick={exportPlayers} className="rounded-2xl bg-white/10 text-white hover:bg-white/20"><Download className="mr-2 h-4 w-4"/> Export CSV</Button>
+        </div>
 
         <div className="grid gap-3 md:hidden">
           {players.map(player=>{
@@ -683,24 +747,27 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
                 </div>
                 <span className={`rounded-full px-3 py-1 text-sm font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role||"player"}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm">
-                <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.points}</div><div className="text-slate-400">Points</div></div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{player.starting_points||0}</div><div className="text-slate-400">Start</div></div>
+                <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.points}</div><div className="text-slate-400">Total</div></div>
                 <div className="rounded-xl bg-white/5 p-2"><div className="font-bold">{stats.totalTips}</div><div className="text-slate-400">Tips</div></div>
               </div>
               <div className="mt-3 grid gap-2">
                 <Button disabled={saving} onClick={()=>promptEditName(player)} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">Edit Name</Button>
+                <Button disabled={saving} onClick={()=>promptEditPoints(player)} className="rounded-2xl bg-sky-400 text-slate-950 hover:bg-sky-300">Edit Points</Button>
                 {player.role==="admin"
                   ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-2xl bg-amber-400 text-slate-950 hover:bg-amber-300">Demote to player</Button>
                   : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">Promote to admin</Button>}
+                <Button disabled={saving||player.id===database.currentUser?.id} onClick={()=>deletePlayer(player.id)} className="rounded-2xl bg-red-500 text-white hover:bg-red-400">Delete Player</Button>
               </div>
             </div>
           })}
         </div>
 
         <div className="hidden overflow-hidden rounded-2xl border border-white/10 md:block">
-          <table className="w-full border-collapse text-left">
+          <table className="w-full table-fixed border-collapse text-left text-sm">
             <thead className="bg-slate-950/70 text-sm uppercase tracking-wide text-slate-400">
-              <tr><th className="w-[18%] px-3 py-3">Name</th><th className="w-[30%] px-3 py-3">Email</th><th className="w-[12%] px-3 py-3">Role</th><th className="w-[8%] px-3 py-3">Tips</th><th className="w-[10%] px-3 py-3">Pts</th><th className="w-[22%] px-3 py-3 text-right">Action</th></tr>
+              <tr><th className="w-[17%] px-3 py-3">Name</th><th className="w-[27%] px-3 py-3">Email</th><th className="w-[11%] px-3 py-3">Role</th><th className="w-[8%] px-3 py-3">Start</th><th className="w-[7%] px-3 py-3">Tips</th><th className="w-[8%] px-3 py-3">Pts</th><th className="w-[22%] px-3 py-3 text-right">Action</th></tr>
             </thead>
             <tbody>{players.map(player=>{
               const stats=getStats(player);
@@ -708,14 +775,17 @@ function PlayerManagementPanel({database,leaderboard,inviteEmail,setInviteEmail,
                 <td className="px-3 py-3 font-bold"><div className="truncate">{displayName(player)}</div></td>
                 <td className="px-3 py-3 text-slate-300"><div className="truncate">{displayEmail(player)}</div></td>
                 <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${player.role==="admin"?"bg-emerald-400 text-slate-950":"bg-white/10 text-white"}`}>{player.role||"player"}</span></td>
+                <td className="px-3 py-3 text-slate-300">{player.starting_points||0}</td>
                 <td className="px-3 py-3 text-slate-300">{stats.totalTips}</td>
                 <td className="px-3 py-3 font-bold text-emerald-300">{stats.points}</td>
                 <td className="px-3 py-3 text-right">
-                  <div className="flex flex-col justify-end gap-2 xl:flex-row">
-                    <Button disabled={saving} onClick={()=>promptEditName(player)} className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20">Edit</Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button disabled={saving} onClick={()=>promptEditName(player)} className="rounded-xl bg-white/10 px-2 py-2 text-xs text-white hover:bg-white/20">Name</Button>
+                    <Button disabled={saving} onClick={()=>promptEditPoints(player)} className="rounded-xl bg-sky-400 px-2 py-2 text-xs text-slate-950 hover:bg-sky-300">Points</Button>
                     {player.role==="admin"
-                      ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-xl bg-amber-400 px-3 py-2 text-xs text-slate-950 hover:bg-amber-300">Demote</Button>
-                      : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-xl bg-emerald-400 px-3 py-2 text-xs text-slate-950 hover:bg-emerald-300">Promote</Button>}
+                      ? <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"player")} className="rounded-xl bg-amber-400 px-2 py-2 text-xs text-slate-950 hover:bg-amber-300">Demote</Button>
+                      : <Button disabled={saving} onClick={()=>updatePlayerRole(player.id,"admin")} className="rounded-xl bg-emerald-400 px-2 py-2 text-xs text-slate-950 hover:bg-emerald-300">Promote</Button>}
+                    <Button disabled={saving||player.id===database.currentUser?.id} onClick={()=>deletePlayer(player.id)} className="rounded-xl bg-red-500 px-2 py-2 text-xs text-white hover:bg-red-400">Delete</Button>
                   </div>
                 </td>
               </tr>
