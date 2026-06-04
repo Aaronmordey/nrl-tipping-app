@@ -344,24 +344,85 @@ export default function App(){
 
   async function refreshSupabaseData(userProfile=currentUser){ if(!supabase||!userProfile)return; setLoading(true); const [{data:profiles,error:pe},{data:games,error:ge},{data:tips,error:te}]=await Promise.all([supabase.from("profiles").select("id,name,email,role,starting_points").order("name"),supabase.from("games").select("*").order("round").order("kickoff_at",{nullsFirst:false}),supabase.from("tips").select("id,player_id,game_id,winner,margin,updated_at")]); if(pe||ge||te){setAuthError(pe?.message||ge?.message||te?.message||"Could not load database."); setLoading(false); return} const fresh=profiles.find(p=>p.id===userProfile.id)||userProfile; setDatabase({currentUser:fresh,players:profiles||[],games:games||[],tips:tips||[]}); if((games||[]).length&&!rounds.includes(Number(selectedRound))) setSelectedRound(getAutoCurrentRound(games||[])); setLoading(false) }
   useEffect(()=>{async function boot(){
-    if(!hasSupabase){const local=loadPreviewDatabase(); setDatabase(local); setSelectedRound(getAutoCurrentRound(local.games||[])); setLoading(false); return}
+    if(!hasSupabase){
+      const local=loadPreviewDatabase();
+      setDatabase(local);
+      setSelectedRound(getAutoCurrentRound(local.games||[]));
+      setLoading(false);
+      return;
+    }
+
     await loadRegistrationSetting();
     await loadFeatureImages();
+
+    const url=new URL(window.location.href);
+    const params=url.searchParams;
     const hash=new URLSearchParams(window.location.hash.replace(/^#/,""));
-    const type=hash.get("type");
-    const access_token=hash.get("access_token");
-    const refresh_token=hash.get("refresh_token");
-    if(type==="recovery"&&access_token&&refresh_token){
-      const {error}=await supabase.auth.setSession({access_token,refresh_token});
-      if(error){setAuthError(error.message); setAuthMode("login");}
-      else{setAuthMode("resetPassword"); setResetSessionReady(true);}
+    const isResetLink=params.get("reset")==="1" || params.get("type")==="recovery" || hash.get("type")==="recovery";
+
+    const code=params.get("code");
+    if(code){
+      const {error}=await supabase.auth.exchangeCodeForSession(code);
+      if(error){
+        setAuthError(error.message);
+        setAuthMode("login");
+      }else{
+        setAuthMode("resetPassword");
+        setResetSessionReady(true);
+      }
       window.history.replaceState({},document.title,window.location.pathname);
       setLoading(false);
       return;
     }
-    const {data}=await supabase.auth.getSession(); const user=data?.session?.user; if(!user){setLoading(false);return}
-    const {data:profile}=await supabase.from("profiles").select("id,name,email,role,starting_points").eq("id",user.id).single(); if(profile) await refreshSupabaseData(profile); setLoading(false)
+
+    const access_token=hash.get("access_token");
+    const refresh_token=hash.get("refresh_token");
+    if(isResetLink&&access_token&&refresh_token){
+      const {error}=await supabase.auth.setSession({access_token,refresh_token});
+      if(error){
+        setAuthError(error.message);
+        setAuthMode("login");
+      }else{
+        setAuthMode("resetPassword");
+        setResetSessionReady(true);
+      }
+      window.history.replaceState({},document.title,window.location.pathname);
+      setLoading(false);
+      return;
+    }
+
+    const {data}=await supabase.auth.getSession();
+    const user=data?.session?.user;
+
+    if(isResetLink&&user){
+      setAuthMode("resetPassword");
+      setResetSessionReady(true);
+      window.history.replaceState({},document.title,window.location.pathname);
+      setLoading(false);
+      return;
+    }
+
+    if(!user){
+      setLoading(false);
+      return;
+    }
+
+    const {data:profile}=await supabase.from("profiles").select("id,name,email,role,starting_points").eq("id",user.id).single();
+    if(profile) await refreshSupabaseData(profile);
+    setLoading(false);
   } boot()},[]);
+
+  useEffect(()=>{
+    if(!hasSupabase)return;
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{
+      if(event==="PASSWORD_RECOVERY"){
+        setAuthMode("resetPassword");
+        setResetSessionReady(true);
+        setDatabase(prev=>({...prev,currentUser:null}));
+      }
+    });
+    return ()=>subscription?.unsubscribe?.();
+  },[]);
   useEffect(()=>{ if(!hasSupabase) savePreviewDatabase(database)},[database]);
   useEffect(()=>{ if(!rounds.includes(Number(selectedRound))&&rounds[0]) setSelectedRound(getAutoCurrentRound(database.games))},[rounds,selectedRound,database.games]);
   useEffect(()=>{ if(currentUser) setDraftTips(database.tips.filter(t=>t.player_id===currentUser.id)); else setDraftTips([]) },[currentUser?.id,database.tips]);
@@ -377,10 +438,10 @@ export default function App(){
     if(!email){setAuthError("Enter your email address first."); return}
     if(!hasSupabase){setNotice("Password reset only works in the live Supabase app."); return}
     setSaving(true);
-    const redirectTo=window.location.origin;
+    const redirectTo=`${window.location.origin}/?reset=1`;
     const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo});
     if(error) setAuthError(error.message);
-    else setNotice("Password reset email sent. Check your inbox and spam folder.");
+    else setNotice("Password reset email sent. Check your inbox and spam folder. The link may take a minute to arrive.");
     setSaving(false);
   }
 
@@ -389,8 +450,14 @@ export default function App(){
     setAuthError(""); setNotice("");
     const password=authForm.newPassword.trim();
     if(password.length<6){setAuthError("Password must be at least 6 characters."); return}
-    if(!hasSupabase||!resetSessionReady){setAuthError("Reset session is not ready. Open the latest reset link from your email."); return}
+    if(!hasSupabase){setAuthError("Password reset only works in the live Supabase app."); return}
     setSaving(true);
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session){
+      setAuthError("Reset session is not ready. Open the latest reset link from your email.");
+      setSaving(false);
+      return;
+    }
     const {error}=await supabase.auth.updateUser({password});
     if(error){setAuthError(error.message); setSaving(false); return}
     await supabase.auth.signOut();
@@ -401,7 +468,6 @@ export default function App(){
     setNotice("Password updated. You can now log in with your new password.");
     setSaving(false);
   }
-  
 
   async function invitePlayer(){
     if(!isAdmin)return;
