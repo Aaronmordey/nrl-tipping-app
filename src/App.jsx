@@ -722,7 +722,7 @@ function updateTip(gameId,update){
     {authError&&<div className="mb-4 rounded-2xl bg-red-500/15 px-4 py-3 text-sm text-red-200">{authError}</div>}{notice&&<div className="mb-4 rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">{notice}</div>}
     <RoundSelector rounds={rounds} selectedRound={selectedRound} setSelectedRound={setSelectedRound} roundLocked={roundLocked} autoCurrentRound={autoCurrentRound} showLocalTime={showLocalTime} setShowLocalTime={setShowLocalTime}/>
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
-    {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving} showLocalTime={showLocalTime}/>} 
+    {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving} showLocalTime={showLocalTime} setShowLocalTime={setShowLocalTime}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
     {activeTab==="reveal"&&<RevealTipsPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} roundLocked={roundLocked} showLocalTime={showLocalTime}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
@@ -779,7 +779,7 @@ function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked,autoCu
   </div>
 }
 function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],["reveal","Tips Reveal",Eye],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
-function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving,showLocalTime}){
+function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving,showLocalTime,setShowLocalTime}){
   const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length;
   const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length;
   const remaining=Math.max(visibleGames.length-draftCount,0);
@@ -796,8 +796,14 @@ function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leade
   return <section className="grid gap-5 lg:grid-cols-[280px_1fr]">
     <Card className="border-white/10 bg-white/10 text-white rounded-3xl">
       <CardContent className="p-5">
-        <h2 className="mb-3 text-lg font-bold">Your tips</h2><div className="mb-3 rounded-2xl bg-slate-950/60 px-3 py-2 text-xs font-bold text-slate-300">{showLocalTime?"Times shown in your local time":"Times shown in Brisbane time"}</div>
-        <p className="text-sm text-slate-300">Pick every game. Use the time toggle above to switch between Brisbane time and your local device time.</p>
+        <h2 className="mb-3 text-lg font-bold">Your tips</h2>
+        <div className="mb-4 rounded-2xl bg-slate-950/60 p-3">
+          <div className="mb-2 text-xs font-bold text-slate-300">{showLocalTime?"Times shown in your local time":"Times shown in Brisbane time"}</div>
+          <button onClick={()=>setShowLocalTime(!showLocalTime)} className="w-full rounded-xl bg-emerald-400 px-3 py-2 text-sm font-black text-slate-950 hover:bg-emerald-300">
+            {showLocalTime?"Show Brisbane Time":"Show My Local Time"}
+          </button>
+        </div>
+        <p className="text-sm text-slate-300">Pick every game. Use the button above to switch between Brisbane time and your local device time.</p>
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
           <div className="text-sm text-slate-400">Saved tips</div>
           <div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div>
