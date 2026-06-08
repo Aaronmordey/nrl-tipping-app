@@ -93,7 +93,15 @@ function makeId(prefix){return `${prefix}_${Math.random().toString(36).slice(2,9
 function getLogo(team,fallback){return teamLogoMap[team] || ((fallback&&String(fallback).startsWith("http"))?fallback:"")}
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
-function getPrettyKickoff(game){ if(!game.kickoff_at) return game.kickoff||"TBC"; try{return new Intl.DateTimeFormat("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Australia/Brisbane"}).format(new Date(game.kickoff_at))}catch{return game.kickoff||"TBC"}}
+function getPrettyKickoff(game,local=false){
+  if(!game.kickoff_at) return game.kickoff||"TBC";
+  try{
+    const options={weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"};
+    if(!local) options.timeZone="Australia/Brisbane";
+    const formatted=new Intl.DateTimeFormat("en-AU",options).format(new Date(game.kickoff_at));
+    return local?`${formatted} local`:formatted;
+  }catch{return game.kickoff||"TBC"}
+}
 function getRoundLockoutTime(games,round){
   const times=(games||[])
     .filter(g=>Number(g.round)===Number(round)&&g.kickoff_at)
@@ -171,7 +179,7 @@ function downloadCsv(filename,headers,rows){
 
 
 export default function App(){
-  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [registrationOpen,setRegistrationOpen]=useState(true); const [featureImages,setFeatureImages]=useState({14:"/weekly/round-14.png"}); const [featureRound,setFeatureRound]=useState("14"); const [featureImageUrl,setFeatureImageUrl]=useState("/weekly/round-14.png"); const [now,setNow]=useState(Date.now()); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
+  const [database,setDatabase]=useState(previewDatabase); const [activeTab,setActiveTab]=useState("tips"); const [authMode,setAuthMode]=useState("login"); const [authForm,setAuthForm]=useState({name:"",email:"",password:"",newPassword:""}); const [authError,setAuthError]=useState(""); const [notice,setNotice]=useState(""); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [showLocalTime,setShowLocalTime]=useState(()=>localStorage.getItem("nrl-show-local-time")==="1"); const [registrationOpen,setRegistrationOpen]=useState(true); const [featureImages,setFeatureImages]=useState({14:"/weekly/round-14.png"}); const [featureRound,setFeatureRound]=useState("14"); const [featureImageUrl,setFeatureImageUrl]=useState("/weekly/round-14.png"); const [now,setNow]=useState(Date.now()); const [inviteEmail,setInviteEmail]=useState(""); const [saveSuccess,setSaveSuccess]=useState(false); const [draftTips,setDraftTips]=useState([]); const [resetSessionReady,setResetSessionReady]=useState(false); const [selectedRound,setSelectedRound]=useState(1); const [importSeason,setImportSeason]=useState(String(new Date().getFullYear())); const [importRound,setImportRound]=useState("1");
   const currentUser=database.currentUser; const isAdmin=currentUser?.role==="admin";
   const rounds=useMemo(()=>{const list=[...new Set(database.games.map(g=>Number(g.round)).filter(Boolean))].sort((a,b)=>a-b); return list.length?list:[1]},[database.games]);
   const visibleGames=database.games.filter(g=>Number(g.round)===Number(selectedRound)).sort((a,b)=>{
@@ -426,6 +434,7 @@ export default function App(){
   useEffect(()=>{ if(!hasSupabase) savePreviewDatabase(database)},[database]);
   useEffect(()=>{ if(!rounds.includes(Number(selectedRound))&&rounds[0]) setSelectedRound(getAutoCurrentRound(database.games))},[rounds,selectedRound,database.games]);
   useEffect(()=>{ if(currentUser) setDraftTips(database.tips.filter(t=>t.player_id===currentUser.id)); else setDraftTips([]) },[currentUser?.id,database.tips]);
+  useEffect(()=>{localStorage.setItem("nrl-show-local-time",showLocalTime?"1":"0")},[showLocalTime]);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(timer)},[]);
   useEffect(()=>{ if(!registrationOpen&&authMode==="register") setAuthMode("login") },[registrationOpen,authMode]);
 
@@ -711,11 +720,11 @@ function updateTip(gameId,update){
   return <div className="min-h-screen bg-slate-950 text-white"><div className="absolute inset-0 overflow-hidden pointer-events-none"><div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl"/><div className="absolute top-96 -left-24 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl"/></div><main className="relative mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
     <Header currentUser={currentUser} isAdmin={isAdmin} database={database} completedGames={completedGames} selectedRound={selectedRound} roundLocked={roundLocked} lockoutCountdown={lockoutCountdown} roundLockoutTime={roundLockoutTime} selectedFeatureImage={selectedFeatureImage} logout={logout}/>
     {authError&&<div className="mb-4 rounded-2xl bg-red-500/15 px-4 py-3 text-sm text-red-200">{authError}</div>}{notice&&<div className="mb-4 rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">{notice}</div>}
-    <RoundSelector rounds={rounds} selectedRound={selectedRound} setSelectedRound={setSelectedRound} roundLocked={roundLocked} autoCurrentRound={autoCurrentRound}/>
+    <RoundSelector rounds={rounds} selectedRound={selectedRound} setSelectedRound={setSelectedRound} roundLocked={roundLocked} autoCurrentRound={autoCurrentRound} showLocalTime={showLocalTime} setShowLocalTime={setShowLocalTime}/>
     <Tabs activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin}/>
-    {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving}/>} 
+    {activeTab==="tips"&&<TipsPanel visibleGames={visibleGames} database={database} currentUser={currentUser} playerTips={playerTips} draftTips={draftTips} leaderboard={leaderboard} updateTip={updateTip} saveAllTips={saveAllTips} saveSuccess={saveSuccess} saving={saving} showLocalTime={showLocalTime}/>} 
     {(activeTab==="leaderboard"||activeTab==="weekly")&&<LeaderboardPanel mode={activeTab} selectedRound={selectedRound} leaderboard={leaderboard} weeklyLeaderboard={weeklyLeaderboard} roundWinner={roundWinner} exportOverallLeaderboard={exportOverallLeaderboard} exportWeeklyLeaderboard={exportWeeklyLeaderboard}/>} {activeTab==="history"&&<HistoryPanel roundSummaries={roundSummaries} setSelectedRound={setSelectedRound} setActiveTab={setActiveTab}/>} 
-    {activeTab==="reveal"&&<RevealTipsPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} roundLocked={roundLocked}/>} 
+    {activeTab==="reveal"&&<RevealTipsPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} roundLocked={roundLocked} showLocalTime={showLocalTime}/>} 
     {activeTab==="adminTips"&&isAdmin&&<TipCheckPanel database={database} visibleGames={visibleGames} selectedRound={selectedRound} exportTipCheck={exportTipCheck}/>} 
     {activeTab==="adminPlayers"&&isAdmin&&<PlayerManagementPanel database={database} leaderboard={leaderboard} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} invitePlayer={invitePlayer} updatePlayerName={updatePlayerName} updatePlayerStartingPoints={updatePlayerStartingPoints} deletePlayer={deletePlayer} updatePlayerRole={updatePlayerRole} exportPlayers={exportPlayers} saving={saving}/>} 
     {activeTab==="admin"&&isAdmin&&<AdminPanel visibleGames={visibleGames} database={database} selectedRound={selectedRound} importSeason={importSeason} setImportSeason={setImportSeason} importRound={importRound} setImportRound={setImportRound} importFixtures={importFixtures} syncResults={syncResults} addFixture={addFixture} toggleLockRound={toggleLockRound} updateGame={updateGame} deleteFixture={deleteFixture} clearSelectedRound={clearSelectedRound} backupAllData={backupAllData} featureRound={featureRound} setFeatureRound={setFeatureRound} featureImageUrl={featureImageUrl} setFeatureImageUrl={setFeatureImageUrl} saveFeatureImage={saveFeatureImage} registrationOpen={registrationOpen} setRegistrationSetting={setRegistrationSetting} saving={saving}/>} 
@@ -755,9 +764,22 @@ function Header({currentUser,isAdmin,database,completedGames,selectedRound,round
   </motion.header>
 }
 function Stat({n,t}){return <div><div className="text-2xl font-bold">{n}</div><div className="text-xs text-slate-300">{t}</div></div>}
-function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked,autoCurrentRound}){return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2"><button onClick={()=>setSelectedRound(autoCurrentRound)} className="rounded-2xl bg-sky-400 px-4 py-2 font-bold text-slate-950 hover:bg-sky-300">Current Round</button>{rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}</div><div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div></div>}
+function RoundSelector({rounds,selectedRound,setSelectedRound,roundLocked,autoCurrentRound,showLocalTime,setShowLocalTime}){
+  return <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-3 backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-wrap gap-2">
+      {autoCurrentRound&&<button onClick={()=>setSelectedRound(autoCurrentRound)} className="rounded-2xl bg-sky-400 px-4 py-2 font-bold text-slate-950 hover:bg-sky-300">Current Round</button>}
+      {rounds.map(r=><button key={r} onClick={()=>setSelectedRound(r)} className={`rounded-2xl px-4 py-2 font-bold ${Number(selectedRound)===Number(r)?"bg-emerald-400 text-slate-950":"bg-white/10 text-slate-200 hover:bg-white/20"}`}>Round {r}</button>)}
+    </div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <button onClick={()=>setShowLocalTime(!showLocalTime)} className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">
+        {showLocalTime?"Show Brisbane Time":"Show My Local Time"}
+      </button>
+      <div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${roundLocked?"bg-amber-400/20 text-amber-100":"bg-emerald-400/20 text-emerald-100"}`}><Clock className="h-4 w-4"/> {roundLocked?"Whole round locked":"Tips open until first game starts"}</div>
+    </div>
+  </div>
+}
 function Tabs({activeTab,setActiveTab,isAdmin}){const tabs=[["tips","Tips",CalendarDays],["leaderboard","Overall",Users],["weekly","Weekly",Medal],["history","History",Trophy],["reveal","Tips Reveal",Eye],...(isAdmin?[["adminTips","Tip Check",ClipboardList],["adminPlayers","Players",UserCog],["admin","Admin",Settings]]:[])];return <div className={`mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur sm:gap-3 sm:p-3 ${isAdmin?"sm:grid-cols-7":"sm:grid-cols-4"}`}>{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>setActiveTab(id)} className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-sm font-semibold transition sm:gap-2 sm:px-4 sm:text-base ${activeTab===id?"bg-emerald-400 text-slate-950":"bg-white/5 text-slate-200 hover:bg-white/10"}`}><Icon className="h-4 w-4"/> {label}</button>)}</div>}
-function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving}){
+function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leaderboard,updateTip,saveAllTips,saveSuccess,saving,showLocalTime}){
   const submittedCount=visibleGames.filter(g=>playerTips.some(t=>t.game_id===g.id)).length;
   const draftCount=visibleGames.filter(g=>draftTips.some(t=>t.game_id===g.id)).length;
   const remaining=Math.max(visibleGames.length-draftCount,0);
@@ -774,8 +796,8 @@ function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leade
   return <section className="grid gap-5 lg:grid-cols-[280px_1fr]">
     <Card className="border-white/10 bg-white/10 text-white rounded-3xl">
       <CardContent className="p-5">
-        <h2 className="mb-3 text-lg font-bold">Your tips</h2>
-        <p className="text-sm text-slate-300">Pick every game. The Save Tips button will appear when you change a tip.</p>
+        <h2 className="mb-3 text-lg font-bold">Your tips</h2><div className="mb-3 rounded-2xl bg-slate-950/60 px-3 py-2 text-xs font-bold text-slate-300">{showLocalTime?"Times shown in your local time":"Times shown in Brisbane time"}</div>
+        <p className="text-sm text-slate-300">Pick every game. Use the time toggle above to switch between Brisbane time and your local device time.</p>
         <div className="mt-5 rounded-2xl bg-slate-950/60 p-4">
           <div className="text-sm text-slate-400">Saved tips</div>
           <div className="mt-1 text-3xl font-bold">{submittedCount}/{visibleGames.length}</div>
@@ -798,7 +820,7 @@ function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leade
         </CardContent>
       </Card>}
 
-      {visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving}/>)}
+      {visibleGames.map(game=><GameTip key={game.id} game={game} database={database} currentUser={currentUser} draftTips={draftTips} updateTip={updateTip} saving={saving} showLocalTime={showLocalTime}/>)}
 
       {(hasUnsavedChanges||saving)&&<Card className="sticky bottom-3 z-20 rounded-3xl border border-emerald-400/30 bg-slate-900/95 text-white shadow-2xl backdrop-blur">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -814,7 +836,7 @@ function TipsPanel({visibleGames,database,currentUser,playerTips,draftTips,leade
     </div>
   </section>
 }
-function GameTip({game,database,currentUser,draftTips,updateTip,saving}){
+function GameTip({game,database,currentUser,draftTips,updateTip,saving,showLocalTime}){
   const tip=draftTips.find(t=>t.player_id===currentUser.id&&t.game_id===game.id);
   const result=getResult(game);
   const points=scoreTip(tip,result);
@@ -856,7 +878,7 @@ function Table({rows}){return <><div className="grid gap-3 md:hidden">{rows.map(
 function HistoryPanel({roundSummaries,setSelectedRound,setActiveTab}){return <div className="grid gap-4">{roundSummaries.map(summary=><Card key={summary.round} className="rounded-3xl border border-white/10 bg-white/10 text-white"><CardContent className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold">Round {summary.round}</h2><p className="text-sm text-slate-300">{summary.completed}/{summary.games} games completed</p>{summary.winner&&<p className="mt-2 text-emerald-200">Leader: <strong>{summary.winner.name}</strong> · {summary.winner.total} points</p>}</div><div className="flex gap-2"><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("weekly")}} className="rounded-2xl bg-emerald-400 text-slate-950 hover:bg-emerald-300">View weekly ladder</Button><Button onClick={()=>{setSelectedRound(summary.round);setActiveTab("tips")}} className="rounded-2xl bg-white/10 text-white hover:bg-white/20">View games</Button></div></div><div className="mt-4 grid gap-2 sm:grid-cols-3">{summary.rows.slice(0,3).map((p,i)=><div key={p.id} className="rounded-2xl bg-slate-950/50 p-3"><div className="text-sm text-slate-400">#{i+1}</div><div className="font-bold">{p.name}</div><div className="text-emerald-300">{p.total} pts</div></div>)}</div></CardContent></Card>)}</div>}
 
 
-function RevealTipsPanel({database,visibleGames,selectedRound,roundLocked}){
+function RevealTipsPanel({database,visibleGames,selectedRound,roundLocked,showLocalTime}){
   const players=[...(database.players||[])].sort((a,b)=>String(a.name||a.email||"").localeCompare(String(b.name||b.email||"")));
   const games=[...(visibleGames||[])];
 
@@ -913,7 +935,7 @@ function RevealTipsPanel({database,visibleGames,selectedRound,roundLocked}){
               <TeamBadge team={game.away} logo={game.away_logo}/>
               <div>
                 <div className="font-bold">{game.home} v {game.away}</div>
-                <div className="text-sm text-slate-300">{getPrettyKickoff(game)}</div>
+                <div className="text-sm text-slate-300">{getPrettyKickoff(game,showLocalTime)}</div>
               </div>
             </div>
             {result&&<div className="rounded-2xl bg-emerald-400/15 px-4 py-2 text-sm font-bold text-emerald-200">Result: {formatResult(result)}</div>}
