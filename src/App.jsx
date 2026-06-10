@@ -18,6 +18,7 @@ const NRL_LEAGUE_ID = "4416";
 const STORAGE_KEY = "nrl-tipping-comp-preview-v3";
 
 const wikiLogo = (file) => `https://en.wikipedia.org/wiki/Special:Redirect/file/${encodeURIComponent(file)}?width=120`;
+const warriorsLogo = "https://upload.wikimedia.org/wikipedia/en/thumb/5/5b/Warriors_%28NRL%29_Logo.svg/250px-Warriors_%28NRL%29_Logo.svg.png";
 
 const teamLogoMap = {
   "Broncos": wikiLogo("Brisbane Broncos logo.svg"),
@@ -69,8 +70,10 @@ const teamLogoMap = {
   "Titans": wikiLogo("Gold Coast Titans logo.svg"),
   "Gold Coast Titans": wikiLogo("Gold Coast Titans logo.svg"),
 
-  "Warriors": wikiLogo("New Zealand Warriors logo.svg"),
-  "New Zealand Warriors": wikiLogo("New Zealand Warriors logo.svg"),
+  "Warriors": warriorsLogo,
+  "NZ Warriors": warriorsLogo,
+  "New Zealand Warriors": warriorsLogo,
+  "One New Zealand Warriors": warriorsLogo,
 
   "Tigers": wikiLogo("Wests Tigers 2022 Logo.svg"),
   "Wests Tigers": wikiLogo("Wests Tigers 2022 Logo.svg")
@@ -90,7 +93,10 @@ const previewDatabase = {
 function loadPreviewDatabase(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||previewDatabase}catch{return previewDatabase}}
 function savePreviewDatabase(db){localStorage.setItem(STORAGE_KEY,JSON.stringify(db))}
 function makeId(prefix){return `${prefix}_${Math.random().toString(36).slice(2,9)}`}
-function getLogo(team,fallback){return teamLogoMap[team] || ((fallback&&String(fallback).startsWith("http"))?fallback:"")}
+function getLogo(team,fallback){
+  const key=String(team||"").trim();
+  return teamLogoMap[key] || teamLogoMap[key.replace(/^One\s+/i,"")] || ((fallback&&String(fallback).startsWith("http"))?fallback:"");
+}
 function teamInitials(team){return String(team||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3).toUpperCase()}
 function parseSportsDate(event){const d=event.dateEvent||event.dateEventLocal; const t=(event.strTime||event.strTimeLocal||"00:00:00").split("+")[0]; return d ? new Date(`${d}T${t.endsWith("Z")?t:t+"Z"}`).toISOString() : null}
 function getPrettyKickoff(game,local=false){
