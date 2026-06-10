@@ -718,7 +718,36 @@ function updateTip(gameId,update){
     setSaving(false);
   }
   async function importFixtures(){ if(!isAdmin)return; setSaving(true); setAuthError(""); setNotice(""); try{ const response=await fetch(`https://www.thesportsdb.com/api/v2/json/schedule/league/${NRL_LEAGUE_ID}/${importSeason}`,{headers:{"X-API-KEY":sportsDbKey}}); const json=await response.json(); const events=json.schedule||json.events||json.event||[]; const roundEvents=events.filter(ev=>String(ev.intRound||ev.intRoundNumber||"")===String(importRound)); if(!roundEvents.length){setNotice(`No fixtures found for season ${importSeason}, round ${importRound}. You can add them manually.`); setSaving(false); return} const rows=roundEvents.map(ev=>normalizeSportsEvent(ev,importSeason)); if(!hasSupabase){let merged=[...database.games]; rows.forEach(row=>{const i=merged.findIndex(g=>g.external_id===row.external_id); if(i>=0)merged[i]={...merged[i],...row}; else merged.push({id:makeId("game"),...row})}); setDatabase({...database,games:merged}); setSelectedRound(Number(importRound)); setNotice(`Imported ${rows.length} fixtures.`); setSaving(false); return} const {error}=await supabase.from("games").upsert(rows,{onConflict:"external_id"}); if(error)throw error; await refreshSupabaseData(currentUser); setSelectedRound(Number(importRound)); setNotice(`Imported ${rows.length} fixtures for Round ${importRound}.`) }catch(error){setAuthError(error.message||"Could not import fixtures.")} setSaving(false)}
-  async function syncResults(){ if(!isAdmin)return; setSaving(true); setAuthError(""); setNotice(""); try{ const response=await fetch(`https://www.thesportsdb.com/api/v2/json/schedule/league/${NRL_LEAGUE_ID}/${importSeason}`,{headers:{"X-API-KEY":sportsDbKey}}); const json=await response.json(); const events=json.schedule||json.events||json.event||[]; const ids=database.games.map(g=>g.external_id).filter(Boolean); const resultRows=events.filter(ev=>ids.includes(String(ev.idEvent))).map(ev=>normalizeSportsEvent(ev,importSeason)).filter(row=>row.home_score!==null&&row.away_score!==null); if(!resultRows.length){setNotice("No completed results found yet."); setSaving(false); return} if(!hasSupabase){setDatabase({...database,games:database.games.map(g=>{const r=resultRows.find(row=>row.external_id===g.external_id); return r?{...g,...r,locked:true}:g})}); setNotice(`Synced ${resultRows.length} results.`); setSaving(false); return} for(const row of resultRows){await supabase.from("games").update({home_score:row.home_score,away_score:row.away_score,status:"completed",locked:true}).eq("external_id",row.external_id)} await refreshSupabaseData(currentUser); setNotice(`Synced ${resultRows.length} completed results.`)}catch(error){setAuthError(error.message||"Could not sync results.")} setSaving(false)}
+  async function syncResults(){
+    if(!isAdmin)return;
+    setSaving(true); setAuthError(""); setNotice("");
+    try{
+      if(!hasSupabase){
+        setNotice("Result sync only works on the live app.");
+        setSaving(false);
+        return;
+      }
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error("Please log in again.");
+      const response=await fetch("/api/sync-results",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${session.access_token}`
+        },
+        body:JSON.stringify({season:importSeason,round:selectedRound})
+      });
+      const json=await response.json();
+      if(!response.ok||!json.ok)throw new Error(json.error||"Could not sync results.");
+      await refreshSupabaseData(currentUser);
+      const source=json.source?` Source: ${json.source}.`:"";
+      const unmatched=json.unmatched?.length?` ${json.unmatched.length} fixture(s) were not matched.`:"";
+      setNotice(json.updated>0?`Synced ${json.updated} completed result(s).${source}${unmatched} Please check the scores in Admin.`:`No completed results found for Round ${selectedRound} yet.${source}${unmatched}`);
+    }catch(error){
+      setAuthError(error.message||"Could not sync results.");
+    }
+    setSaving(false)
+  }
 
   if(loading)return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">Loading tipping comp...</div>;
   if(!currentUser)return <LoginScreen authMode={authMode} setAuthMode={setAuthMode} authForm={authForm} setAuthForm={setAuthForm} authError={authError} notice={notice} registrationOpen={registrationOpen} handleAuth={handleAuth} sendPasswordReset={sendPasswordReset} updatePassword={updatePassword} saving={saving}/>;
